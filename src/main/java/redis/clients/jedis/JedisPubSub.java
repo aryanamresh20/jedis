@@ -24,6 +24,10 @@ public abstract class JedisPubSub {
   public void onMessage(String channel, String message) {
   }
 
+  //extra onMessage exposed to recieve invalidation messages from server on channel __redis__:invalidate
+  public void onMessage(String channel, List <String> message) {
+  }
+
   public void onPMessage(String pattern, String channel, String message) {
   }
 
@@ -146,10 +150,17 @@ public abstract class JedisPubSub {
         onUnsubscribe(strchannel, subscribedChannels);
       } else if (Arrays.equals(MESSAGE.getRaw(), resp)) {
         final byte[] bchannel = (byte[]) reply.get(1);
-        final byte[] bmesg = (byte[]) reply.get(2);
         final String strchannel = (bchannel == null) ? null : SafeEncoder.encode(bchannel);
-        final String strmesg = (bmesg == null) ? null : SafeEncoder.encode(bmesg);
-        onMessage(strchannel, strmesg);
+        Object bmesg = reply.get(2);
+        if(bmesg instanceof List) {
+          final Object strmesg = (bmesg == null) ? null : SafeEncoder.encodeObject(bmesg);
+          List <String> strmesgn = (List <String> ) strmesg;
+          onMessage(strchannel, strmesgn);
+        } else {
+          final byte[] bmesgn = (byte[]) bmesg;
+          final String strmesg = (bmesgn == null) ? null : SafeEncoder.encode(bmesgn);
+          onMessage(strchannel, strmesg);
+        }
       } else if (Arrays.equals(PMESSAGE.getRaw(), resp)) {
         final byte[] bpattern = (byte[]) reply.get(1);
         final byte[] bchannel = (byte[]) reply.get(2);
