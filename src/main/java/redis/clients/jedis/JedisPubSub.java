@@ -8,6 +8,7 @@ import static redis.clients.jedis.Protocol.Keyword.SUBSCRIBE;
 import static redis.clients.jedis.Protocol.Keyword.UNSUBSCRIBE;
 import static redis.clients.jedis.Protocol.Keyword.PONG;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -145,11 +146,52 @@ public abstract class JedisPubSub {
         final String strchannel = (bchannel == null) ? null : SafeEncoder.encode(bchannel);
         onUnsubscribe(strchannel, subscribedChannels);
       } else if (Arrays.equals(MESSAGE.getRaw(), resp)) {
+        // System.out.println("got message");
         final byte[] bchannel = (byte[]) reply.get(1);
-        final byte[] bmesg = (byte[]) reply.get(2);
         final String strchannel = (bchannel == null) ? null : SafeEncoder.encode(bchannel);
+        final byte[] bmesg;
+        System.out.println(strchannel);
+        String s2="__redis__:invalidate";
+        if(strchannel.equals(s2)) {
+          //  System.out.println("got message");
+          // final byte[] bmesg = (byte[]) reply.get(2);
+          final ArrayList<byte[]> in = (ArrayList<byte[]>) reply.get(2);
+          //ArrayList<Byte> in = ...;
+          // var listOfArrays = new List<byte[]>();
+
+          // System.out.println("here");
+          int n = 0;
+          for (int i = 0; i < in.size(); i++) {
+            for (int j = 0; j < in.get(i).length; j++)
+              n++;
+          }
+          // int n = in.size();
+          //  Object o=in.get(0);
+          // System.out.println(o.getClass().getSimpleName());
+          bmesg = new byte[n];
+          int k = 0;
+          for (int i = 0; i < in.size(); i++) {
+            for (int j = 0; j < in.get(i).length; j++) {
+              bmesg[k] = (in.get(i))[j];
+              k++;
+            }
+          }
+        }
+        else
+        {
+          bmesg = (byte[]) reply.get(2);
+        }
+
+        // final Object strmesg = reply.get(2);
+        // System.out.println(strmesg);
+        // System.out.println("got message");
+
+        // System.out.println("got message");
         final String strmesg = (bmesg == null) ? null : SafeEncoder.encode(bmesg);
+        //  System.out.println("got message");
         onMessage(strchannel, strmesg);
+
+        // onMessage(strchannel,"redisserver");
       } else if (Arrays.equals(PMESSAGE.getRaw(), resp)) {
         final byte[] bpattern = (byte[]) reply.get(1);
         final byte[] bchannel = (byte[]) reply.get(2);
