@@ -94,11 +94,25 @@ public class CacheJedis extends Jedis implements JedisCommands, MultiKeyCommands
         cache_put(key,value);
         return value;
     }
+    public void connection()
+    {
+        if(check_connect())
+            cache.cleanUp();
+    }
+    public boolean check_connect()
+    {
+        jedisPubSub.ping();
+        int flag=jedisPubSub.getSubscribedChannels();
+        if(flag==1)
+            return true;
+        return false;
+    }
 
     @Override
     public void close()
     {
         super.close();
+        cache.cleanUp();
         jedisPubSub.unsubscribe("__redis__:invalidate");
     }
 
