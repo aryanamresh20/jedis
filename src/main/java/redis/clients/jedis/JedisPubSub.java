@@ -152,6 +152,7 @@ public abstract class JedisPubSub {
         final byte[] bchannel = (byte[]) reply.get(1);
         final String strchannel = (bchannel == null) ? null : SafeEncoder.encode(bchannel);
         Object bmesg = reply.get(2);
+        //THe server sends a List rather than a byte[] on the redis invalidate channel;
         if(bmesg instanceof List) {
           final Object strmesg = (bmesg == null) ? null : SafeEncoder.encodeObject(bmesg);
           List <String> strmesgn = (List <String> ) strmesg;

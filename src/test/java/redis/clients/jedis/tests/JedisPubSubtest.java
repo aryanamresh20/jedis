@@ -22,16 +22,15 @@ public class JedisPubSubtest  {
     public void PubSub()
     {
 
-        JedisPoolConfig config=new JedisPoolConfig();
-        config.setMaxTotal(100); // Set the maximum number of connections
-        config.setMaxIdle(10); // Set the maximum number of idle connections
+        JedisPoolConfig config = new JedisPoolConfig();
+
         JedisPool pool = new JedisPool(config,"localhost",6379);
 
         Jedis JedisSub = pool.getResource(); // Jedis Instance which subscribes the channel
-        Jedis JedisData = pool.getResource(); // Jedis instance which used for tracking
-        Jedis JedisOther = pool.getResource(); // Jedis instance for changing the data to get an invalidation message
 
-        String ClientID= String.valueOf(JedisSub.clientId());
+        Jedis JedisData = pool.getResource(); // Jedis instance which used for tracking
+
+        String ClientID = String.valueOf(JedisSub.clientId());
 
         //Runnable for tracking the Client and other functionalities
         Runnable RunnableTracker = () -> {
@@ -39,7 +38,7 @@ public class JedisPubSubtest  {
                     SafeEncoder.encode("REDIRECT"),SafeEncoder.encode(ClientID));
             JedisData.set("foo","bar");
             String value = JedisData.get("foo");
-            //assertEquals("bar",value);
+            assertEquals("bar",value);
         };
 
         //Runnable for running the PubSub channel on different thread
@@ -50,7 +49,7 @@ public class JedisPubSubtest  {
                 @Override
                 public void onMessage(String channel, List <String> message) {
                     System.out.println("Channel " + channel + " has sent a message : " + message);
-                    assertEquals("foo",message.get(0));
+                    assertEquals("foo",message.get(0)); //First invalidation message
                 }
 
                 @Override
@@ -66,31 +65,22 @@ public class JedisPubSubtest  {
             };
             JedisSub.subscribe(jedisPubSub, "__redis__:invalidate");
         };
-        Runnable RunnableOther = () -> {
-            Thread thread=Thread.currentThread();
-            try
-            {
-                System.out.println("aara");
-                thread.sleep(10000000);
-            }
-            catch(InterruptedException ex)
-            {
 
-            }
-            String result = JedisOther.get("foo");
-            assertEquals("bar",result);
-            JedisOther.set("foo","newbar");
-        };
 
         Thread thread1 = new Thread(RunnableSub);
-        Thread thread=Thread.currentThread();
-
         Thread thread2 = new Thread(RunnableTracker);
-
-        Thread thread3 = new Thread(RunnableOther);
         thread1.start();
         thread2.start();
-        thread3.start();
+        PubSubExtended();
+
+    }
+
+    //Another Instance changing the value of key foo
+    @Test
+    public void PubSubExtended()
+    {
+        Jedis jedis = new Jedis("localhost");
+        jedis.set("foo","newfoo");
     }
 
 
