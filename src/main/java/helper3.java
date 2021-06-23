@@ -6,6 +6,7 @@ public class helper3 {
         System.out.println(5);
         c.set("foo","bar");
         System.out.println(c.get("foo"));
+        c.close();
     }
 
 }
