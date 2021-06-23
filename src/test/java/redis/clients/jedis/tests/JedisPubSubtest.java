@@ -1,5 +1,9 @@
 package redis.clients.jedis.tests;
 
+
+import static org.junit.Assert.assertEquals;
+
+
 import org.junit.Test;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
@@ -9,13 +13,15 @@ import redis.clients.jedis.tests.commands.JedisCommandTestBase;
 import redis.clients.jedis.util.SafeEncoder;
 
 import java.util.List;
+import java.util.Scanner;
 
 import static redis.clients.jedis.Protocol.Command.CLIENT;
-public class JedisPubSubtest extends JedisCommandTestBase {
+public class JedisPubSubtest  {
 
     @Test
     public void PubSub()
     {
+
         JedisPoolConfig config=new JedisPoolConfig();
         config.setMaxTotal(100); // Set the maximum number of connections
         config.setMaxIdle(10); // Set the maximum number of idle connections
@@ -30,9 +36,10 @@ public class JedisPubSubtest extends JedisCommandTestBase {
         //Runnable for tracking the Client and other functionalities
         Runnable RunnableTracker = () -> {
             JedisData.sendCommand(CLIENT, SafeEncoder.encode("TRACKING"),SafeEncoder.encode("on"),
-                    SafeEncoder.encode("REDIRECT"),SafeEncoder.encode(ClientID)));
+                    SafeEncoder.encode("REDIRECT"),SafeEncoder.encode(ClientID));
             JedisData.set("foo","bar");
-            System.out.println(JedisData.get("bar"));
+            String value = JedisData.get("foo");
+            //assertEquals("bar",value);
         };
 
         //Runnable for running the PubSub channel on different thread
@@ -43,6 +50,7 @@ public class JedisPubSubtest extends JedisCommandTestBase {
                 @Override
                 public void onMessage(String channel, List <String> message) {
                     System.out.println("Channel " + channel + " has sent a message : " + message);
+                    assertEquals("foo",message.get(0));
                 }
 
                 @Override
@@ -59,17 +67,32 @@ public class JedisPubSubtest extends JedisCommandTestBase {
             JedisSub.subscribe(jedisPubSub, "__redis__:invalidate");
         };
         Runnable RunnableOther = () -> {
+            Thread thread=Thread.currentThread();
             try
             {
-                Thread.sleep()
+                System.out.println("aara");
+                thread.sleep(10000000);
             }
-        }
+            catch(InterruptedException ex)
+            {
 
-        Thread thread1 = new Thread(runnable2);
-        Thread thread= new Thread(runnable);
+            }
+            String result = JedisOther.get("foo");
+            assertEquals("bar",result);
+            JedisOther.set("foo","newbar");
+        };
+
+        Thread thread1 = new Thread(RunnableSub);
+        Thread thread=Thread.currentThread();
+
+        Thread thread2 = new Thread(RunnableTracker);
+
+        Thread thread3 = new Thread(RunnableOther);
         thread1.start();
-        thread.start();
+        thread2.start();
+        thread3.start();
     }
+
 
 }
 
