@@ -24,8 +24,13 @@ public abstract class JedisPubSub {
   public void onMessage(String channel, String message) {
   }
 
-  //extra onMessage exposed to recieve invalidation messages from server on channel __redis__:invalidate
-  public void onMessage(String channel, List <String> message) {
+
+  /**
+   * The channel can send either a byte[] array or a list of byte[] array. {@link redis.clients.jedis.Protocol.process}
+   * Exposing the missing onMessage method to handle list of Object.
+   */
+  @SuppressWarnings("JavadocReference")
+  public void onMessage(String channel, List<Object> message) {
   }
 
   public void onPMessage(String pattern, String channel, String message) {
@@ -151,15 +156,14 @@ public abstract class JedisPubSub {
       } else if (Arrays.equals(MESSAGE.getRaw(), resp)) {
         final byte[] bchannel = (byte[]) reply.get(1);
         final String strchannel = (bchannel == null) ? null : SafeEncoder.encode(bchannel);
-        Object bmesg = reply.get(2);
-        //THe server sends a List rather than a byte[] on the redis invalidate channel;
-        if(bmesg instanceof List) {
-          final Object strmesg = (bmesg == null) ? null : SafeEncoder.encodeObject(bmesg);
-          List <String> strmesgn = (List <String> ) strmesg;
-          onMessage(strchannel, strmesgn);
+        Object channelMessage = reply.get(2);
+        if(channelMessage instanceof List) {
+          final Object encodedObject = SafeEncoder.encodeObject(channelMessage);
+          List<Object> objectList = (List <Object>) encodedObject;
+          onMessage(strchannel, objectList);
         } else {
-          final byte[] bmesgn = (byte[]) bmesg;
-          final String strmesg = (bmesgn == null) ? null : SafeEncoder.encode(bmesgn);
+          final byte[] bmesg = (byte[]) channelMessage;
+          final String strmesg = (bmesg == null) ? null : SafeEncoder.encode(bmesg);
           onMessage(strchannel, strmesg);
         }
       } else if (Arrays.equals(PMESSAGE.getRaw(), resp)) {
