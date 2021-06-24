@@ -24,6 +24,15 @@ public abstract class JedisPubSub {
   public void onMessage(String channel, String message) {
   }
 
+
+  /**
+   * The channel can send either a byte[] array or a list of byte[] array. {@link redis.clients.jedis.Protocol.process}
+   * Exposing the missing onMessage method to handle list of Object.
+   */
+  @SuppressWarnings("JavadocReference")
+  public void onMessage(String channel, List<Object> message) {
+  }
+
   public void onPMessage(String pattern, String channel, String message) {
   }
 
@@ -146,10 +155,17 @@ public abstract class JedisPubSub {
         onUnsubscribe(strchannel, subscribedChannels);
       } else if (Arrays.equals(MESSAGE.getRaw(), resp)) {
         final byte[] bchannel = (byte[]) reply.get(1);
-        final byte[] bmesg = (byte[]) reply.get(2);
         final String strchannel = (bchannel == null) ? null : SafeEncoder.encode(bchannel);
-        final String strmesg = (bmesg == null) ? null : SafeEncoder.encode(bmesg);
-        onMessage(strchannel, strmesg);
+        Object channelMessage = reply.get(2);
+        if(channelMessage instanceof List) {
+          final Object encodedObject = SafeEncoder.encodeObject(channelMessage);
+          List<Object> objectList = (List <Object>) encodedObject;
+          onMessage(strchannel, objectList);
+        } else {
+          final byte[] bmesg = (byte[]) channelMessage;
+          final String strmesg = (bmesg == null) ? null : SafeEncoder.encode(bmesg);
+          onMessage(strchannel, strmesg);
+        }
       } else if (Arrays.equals(PMESSAGE.getRaw(), resp)) {
         final byte[] bpattern = (byte[]) reply.get(1);
         final byte[] bchannel = (byte[]) reply.get(2);
