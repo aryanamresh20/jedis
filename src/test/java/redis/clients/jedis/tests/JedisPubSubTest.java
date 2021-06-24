@@ -60,8 +60,13 @@ public class JedisPubSubTest {
         Thread thread2 = new Thread(runnableTracker);
         thread1.start();
         thread2.start();
-
-        Jedis jedis = new Jedis("localhost");
+        Thread thread = Thread.currentThread();
+        try{
+            thread.sleep(200);
+        }
+        catch(InterruptedException e) {
+        }
+        Jedis jedis = pool.getResource();
         jedis.set("foo", "newfoo");
         Thread.sleep(1);
         assertEquals("foo", invalidationKey.get());
