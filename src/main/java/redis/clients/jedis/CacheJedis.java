@@ -292,6 +292,7 @@ public class CacheJedis extends Jedis {
             return String.valueOf(cacheGet(key));
         } else {
             String value=super.get(key);
+            if(value!=null)
             cachePut(key,value);
             return value;
         }
