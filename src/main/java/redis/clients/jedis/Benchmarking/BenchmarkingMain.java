@@ -8,7 +8,7 @@ import java.util.Properties;
 public class BenchmarkingMain {
 
     public static void main(String args[]) throws FileNotFoundException {
-        String filePath = "src/main/java/redis/clients/jedis/Benchmarking/config.properties";
+        String filePath = "/Users/aryanamresh/Documents/jedis/out/artifacts/jedis_jar/config.properties";
         Properties props = new Properties();
         FileInputStream ip = new FileInputStream(filePath);
         try {
