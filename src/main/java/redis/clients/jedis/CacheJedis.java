@@ -26,7 +26,7 @@ public class CacheJedis extends Jedis {
         @Override
         public void onMessage(String channel, List<Object> message) {
             //TODO Remove this message in the final Commit
-            System.out.println("Channel " + channel + " has sent a message : " + message);
+           // System.out.println("Channel " + channel + " has sent a message : " + message);
             for (Object instance : message)
                 invalidate(String.valueOf(instance)); //invalidating the keys received from the channel considering as a List
         }
@@ -34,13 +34,13 @@ public class CacheJedis extends Jedis {
         @Override
         public void onSubscribe(String channel, int subscribedChannels) {
             //TODO Remove this message in the final Commit
-            System.out.println("Client is Subscribed to channel : " + channel);
+            //System.out.println("Client is Subscribed to channel : " + channel);
         }
 
         @Override
         public void onUnsubscribe(String channel, int subscribedChannels) {
             //TODO Remove this message in the final Commit
-            System.out.println("Client is Unsubscribed from channel : " + channel);
+           // System.out.println("Client is Unsubscribed from channel : " + channel);
         }
     };
     //TODO set various parameters as per the user
@@ -295,6 +295,17 @@ public class CacheJedis extends Jedis {
             if(value!=null)
             cachePut(key,value);
             return value;
+        }
+    }
+
+    public Boolean boolGet(String key) {
+        if(cacheGet(key)!= null) {
+            return true;
+        } else {
+            String value=super.get(key);
+            if(value!=null)
+                cachePut(key,value);
+            return false;
         }
     }
 
