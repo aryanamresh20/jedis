@@ -1,4 +1,4 @@
-package redis.clients.jedis.Benchmarking;
+package redis.clients.jedis.benchmarking;
 
 import redis.clients.jedis.CacheJedis;
 import redis.clients.jedis.Jedis;
@@ -7,7 +7,6 @@ import java.util.Calendar;
 
 public class SingleReads {
 
-    private Jedis jedis ;
     private String hostName;
     private int portNumber;
     private long begin;
@@ -16,11 +15,11 @@ public class SingleReads {
     public SingleReads(String host,int port,int numberOfKeys) {
         hostName = host;
         portNumber = port;
-        jedis = new Jedis(hostName,portNumber);
         totalKeys = numberOfKeys;
         populateDatabase();
     }
     private void populateDatabase(){
+        Jedis jedis = new Jedis(hostName,portNumber);
         for(int i=0 ; i<totalKeys ; i++){
             jedis.set(String.valueOf(i),"hello"+i); //Populating the database with multiple number of keys
         }

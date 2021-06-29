@@ -1,4 +1,4 @@
-package redis.clients.jedis.Benchmarking;
+package redis.clients.jedis.benchmarking;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -7,16 +7,14 @@ import java.util.Properties;
 
 public class BenchmarkingMain {
 
-    public static void main(String args[]) throws FileNotFoundException {
+    public static void main(String args[]) throws FileNotFoundException,InterruptedException,IOException {
         //config file for setting various properties
         String filePath = "/Users/aryanamresh/Documents/jedis/out/artifacts/jedis_jar/config.properties";
         Properties props = new Properties();
         FileInputStream ip = new FileInputStream(filePath);
-        try {
-            props.load(ip);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        props.load(ip);
+
+        //Assigning various properties to local parameters
         String hostName = props.getProperty("hostName");
         int portNumber = Integer.parseInt(props.getProperty("portNumber"));
         int numberOfKeys = Integer.parseInt(props.getProperty("numberOfKeys"));
@@ -24,6 +22,8 @@ public class BenchmarkingMain {
         int readPercentage = Integer.parseInt(props.getProperty("readPercentage"));
         int writePercentage = Integer.parseInt(props.getProperty("writePercentage"));
         int numberOfOperations = Integer.parseInt(props.getProperty("numberOfOperations"));
+        int meanOperationTime = Integer.parseInt(props.getProperty("meanOperationTime"));
+        double sigmaOperationTime = Double.parseDouble(props.getProperty("sigmaOperationTime"));
 
         //Comparing the time elapsed for reads where all reads comprise of cache misses
         SingleReads singleReads = new SingleReads(hostName,portNumber,numberOfKeys);
@@ -36,16 +36,7 @@ public class BenchmarkingMain {
         System.out.println("Cache reads time Taken by CacheJedis instance "+cacheReads.CacheJedisTest());
 
         //Evaluating various parameters on multi CacheJedis clients Stale values , Cache Misses e.t.c on various parameters
-        CountStaleValues countStaleValues = new CountStaleValues(hostName,portNumber,numberOfClients,numberOfKeys,readPercentage,writePercentage,numberOfOperations);
-        Thread thread = Thread.currentThread();
-        //Let the functions execute and then we get our various parameters
-        try{
-            thread.sleep(400);
-        }
-        catch(InterruptedException e) {
-        }{
-
-        }
+        CountStaleValues countStaleValues = new CountStaleValues(hostName,portNumber,numberOfClients,numberOfKeys,readPercentage,writePercentage,numberOfOperations,meanOperationTime,sigmaOperationTime);
         System.out.println("Stale values "+countStaleValues.getStaleCount());
         System.out.println("Cache Hits "+countStaleValues.getCacheHit());
         System.out.println("Cache Misses "+countStaleValues.getCacheMiss());

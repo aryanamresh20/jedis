@@ -1,28 +1,27 @@
-package redis.clients.jedis.Benchmarking;
+package redis.clients.jedis.benchmarking;
 
 import redis.clients.jedis.CacheJedis;
 import redis.clients.jedis.Jedis;
-
-import java.util.HashMap;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class CountStaleValues {
 
-
-    private Jedis jedis;
     private String hostName;
     private int portNumber;
-    private int staleCount = 0;
-    private int cacheHit = 0;
+    private volatile int staleCount = 0;
+    private volatile int cacheHit = 0;
+    private volatile int totalGet = 0;
     private int cacheMiss = 0;
-    private int totalGet = 0;
     private int reads ;
     private int writes;
     private int totalClients ;
     private int totalKeys;
     private int totalOperations;
-    private HashMap<String , String> checkStale = new HashMap<String , String>(); //To keep track of the lat client setting the key
-    public CountStaleValues(String host,int port,int numberOfClients , int numberOfKeys , int readPercentage , int writePercentage , int numberOfOperations) {
+    private double sigma ;
+    private int mean ;
+    private ConcurrentHashMap<String , String> checkStale = new ConcurrentHashMap<>(); //To keep track of the lat client setting the key
+    public CountStaleValues(String host,int port,int numberOfClients , int numberOfKeys , int readPercentage , int writePercentage , int numberOfOperations , int meanOperationTime , double sigmaOperationTime) {
         totalClients = numberOfClients;
         reads = readPercentage;
         writes = writePercentage;
@@ -30,21 +29,29 @@ public class CountStaleValues {
         hostName = host;
         portNumber = port;
         totalOperations = numberOfOperations;
-        jedis = new Jedis(hostName,portNumber);
+        mean = meanOperationTime;
+        sigma = sigmaOperationTime;
         populateDatabase();
         cacheJedisThreads();
     }
     private void populateDatabase(){
+        Jedis jedis = new Jedis(hostName,portNumber);
         for(int i=0; i<totalKeys ; i++){
             jedis.set(String.valueOf(i),"hello"+i); //Populate database with multiple keys
         }
+        jedis.close();
     }
     //Starting multiple cacheJedis instances on multiple threads
-    private void cacheJedisThreads(){
+    private void cacheJedisThreads()  {
         for(int i=0; i<totalClients ;i ++){
             Thread thread =new Thread(runnable);
             thread.setName("thread"+i);
             thread.start();
+            try {
+                thread.join(); // Waiting for all threads to complete
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
     //returns 0 (set) OR 1 (get) depending upon the requirements of reads and writes
@@ -62,29 +69,52 @@ public class CountStaleValues {
         Random rand = new Random();
         return rand.nextInt(totalKeys);
     }
+    private long waitTime(){
+        Random rand = new Random();
+        long value = (long) (rand.nextGaussian()*sigma+mean);
+        if(value<0){
+            return 0;
+        }
+        return value;
+    }
+
+    private synchronized void incStaleCount(){ staleCount++; }
+    private synchronized void incTotalGet(){ totalGet++; }
+    private synchronized void incCacheHit() { cacheHit++; }
+
+    //Runnable for each thread
     Runnable runnable = () -> {
         CacheJedis cacheJedis = new CacheJedis(hostName,portNumber);
         String clientId = String.valueOf(cacheJedis.clientId());
+        Thread thread = Thread.currentThread();
         for(int i=0;i<totalOperations;i++) {
             int randomGetSet = getBinaryRandom();
-
             if (randomGetSet == 0) { //SET functionality
                 int randomKey = getRandom() ;
                 cacheJedis.set(String.valueOf(randomKey), "hello" + clientId);
                 checkStale.put(String.valueOf(randomKey), clientId); //Updating the value of clientId writing on the key
             } else { //GET functionality
-                totalGet++;
-                int randomKey = getRandom() ;
+                incTotalGet();
+                int randomKey = getRandom();
                 Boolean flag = cacheJedis.boolGet(String.valueOf(randomKey)); //Check if the key was accessed from the cache
                 if (flag) {
                     String value = checkStale.get(String.valueOf(randomKey));
-                    cacheHit++;
+                    incCacheHit(); //key found in cache
                     if(value!=null) {
                         if (!(value.equals(clientId))) { //Check if the value was stale
-                            staleCount++;
+                            incStaleCount();
                         }
                     }
                 }
+            }
+            long waitTime = waitTime();
+            if(waitTime<0){
+                waitTime = 0;
+            }
+            try {
+                thread.sleep(waitTime);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
         }
         cacheJedis.close();
