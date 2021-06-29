@@ -9,6 +9,7 @@ import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocketFactory;
 import java.net.URI;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -296,6 +297,14 @@ public class CacheJedis extends Jedis {
             cachePut(key,value);
             return value;
         }
+    }
+
+    @Override
+    public List<String> mget(String... keys) {
+        for(int index = 0 ; index < keys.length ; index++){
+            keys[index] = get(keys[index]);
+        }
+        return Arrays.asList(keys);
     }
 
     //For checking if the connection is active
