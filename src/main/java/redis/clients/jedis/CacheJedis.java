@@ -289,6 +289,7 @@ public class CacheJedis extends Jedis {
 
     @Override
     public String get(String key) {
+        checkIsInMultiOrPipeline();
         if(cacheGet(key)!= null) {
             return String.valueOf(cacheGet(key));
         } else {
@@ -301,6 +302,7 @@ public class CacheJedis extends Jedis {
 
     @Override
     public List<String> mget(String... keys) {
+        checkIsInMultiOrPipeline();
         for(int index = 0 ; index < keys.length ; index++){
             keys[index] = get(keys[index]);
         }
