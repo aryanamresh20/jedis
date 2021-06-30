@@ -1,48 +1,61 @@
 package redis.clients.jedis;
 
+import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.jedis.util.SafeEncoder;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocketFactory;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static redis.clients.jedis.Protocol.Command.CLIENT;
 
 public class CacheJedis extends Jedis {
-    private Jedis jedisInvalidationSubscribe ; // Jedis instance for receiving invalidation messages
+    private volatile Jedis jedisInvalidationSubscribe ; // Jedis instance for receiving invalidation messages
     private final static String invalidationChannel = "__redis__:invalidate";
     private int maxSize = 100;  // Cache max size by default 100
-    private int expireAfterAccess = 5 ; // By default 5 minutes of cache to invalidate a key after acess
+    private int expireAfterAccess = 5 ; // By default 5 minutes of cache to invalidate a key after access
     private int expireAfterWrite = 5 ; // By default 5 minutes of cache to invalidate a key after write
-    private LoadingCache<String, Object> cache;
-    final JedisPubSub jedisPubSub = new JedisPubSub() {
-        //Overriding different methods of pub sub to take appropriate actions
-        @Override
-        public void onMessage(String channel, List<Object> message) {
-            //TODO Remove this message in the final Commit
-           // System.out.println("Channel " + channel + " has sent a message : " + message);
-            for (Object instance : message)
-                invalidate(String.valueOf(instance)); //invalidating the keys received from the channel considering as a List
-        }
+    private Cache<String, Object> cache;
+    private  JedisPubSub jedisPubSub;
 
-        @Override
-        public void onSubscribe(String channel, int subscribedChannels) {
-            //TODO Remove this message in the final Commit
-            //System.out.println("Client is Subscribed to channel : " + channel);
-        }
+    public void startJedisPubSub()
+    {
+        jedisPubSub = new JedisPubSub() {
+            //Overriding different methods of pub sub to take appropriate actions
+            @Override
+            public void onMessage(String channel, List<Object> message) {
+                //TODO Remove this message in the final Commit
 
-        @Override
-        public void onUnsubscribe(String channel, int subscribedChannels) {
-            //TODO Remove this message in the final Commit
-           // System.out.println("Client is Unsubscribed from channel : " + channel);
-        }
-    };
+               // System.out.println("Channel " + channel + " has sent a message : " + message);
+                for (Object instance : message) {
+                    cache.invalidate(String.valueOf(instance));///invalidating the keys received from the channel considering as a List
+                }
+            }
+
+            @Override
+            public void onSubscribe(String channel, int subscribedChannels) {
+                //TODO Remove this message in the final Commit
+
+                // System.out.println("Client is Subscribed to channel : " + channel);
+            }
+
+            @Override
+            public void onUnsubscribe(String channel, int subscribedChannels) {
+                //TODO Remove this message in the final Commit
+
+                // System.out.println("Client is Unsubscribed from channel : " + channel);
+            }
+        };
+    }
     //TODO set various parameters as per the user
     public void LoadCache()
     {
@@ -50,11 +63,7 @@ public class CacheJedis extends Jedis {
                 .maximumSize(maxSize)
                 .expireAfterAccess(expireAfterAccess, TimeUnit.MINUTES)
                 .expireAfterWrite(expireAfterWrite,TimeUnit.MINUTES)
-                .build(new CacheLoader<String, Object>() {
-                    @Override public Object load(String key) throws Exception {
-                        return new Object();
-                    }
-                });
+                .build();
     }
 
     //Different Constructors present in the jedis class implemented in CacheJedis
@@ -62,7 +71,7 @@ public class CacheJedis extends Jedis {
         super();
         jedisInvalidationSubscribe = new Jedis();
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -70,7 +79,7 @@ public class CacheJedis extends Jedis {
         super(uri);
         jedisInvalidationSubscribe = new Jedis(uri);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -78,14 +87,15 @@ public class CacheJedis extends Jedis {
         super(hp);
         jedisInvalidationSubscribe = new Jedis(hp);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
+        LoadCache();
     }
 
     public CacheJedis(HostAndPort hp, JedisClientConfig config) {
         super(hp, config);
         jedisInvalidationSubscribe = new Jedis(hp, config);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -93,7 +103,7 @@ public class CacheJedis extends Jedis {
         super(host, port);
         jedisInvalidationSubscribe = new Jedis(host, port);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -101,7 +111,7 @@ public class CacheJedis extends Jedis {
         super(host, port, ssl);
         jedisInvalidationSubscribe = new Jedis(host, port, ssl);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -109,7 +119,7 @@ public class CacheJedis extends Jedis {
         super(host, port, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
         jedisInvalidationSubscribe = new Jedis(host, port, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -117,7 +127,7 @@ public class CacheJedis extends Jedis {
         super(host, port, timeout);
         jedisInvalidationSubscribe = new Jedis(host, port, timeout);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -125,7 +135,7 @@ public class CacheJedis extends Jedis {
         super(host, port, timeout, ssl);
         jedisInvalidationSubscribe = new Jedis(host, port, timeout, ssl);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -133,7 +143,7 @@ public class CacheJedis extends Jedis {
         super(host, port, timeout, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
         jedisInvalidationSubscribe = new Jedis(host, port, timeout, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -141,7 +151,7 @@ public class CacheJedis extends Jedis {
         super(host, port, connectionTimeout, soTimeout);
         jedisInvalidationSubscribe = new Jedis(host, port, connectionTimeout, soTimeout);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -149,7 +159,7 @@ public class CacheJedis extends Jedis {
         super(host, port, connectionTimeout, soTimeout, infiniteSoTimeout);
         jedisInvalidationSubscribe = new Jedis(host, port, connectionTimeout, soTimeout, infiniteSoTimeout);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -157,7 +167,7 @@ public class CacheJedis extends Jedis {
         super(host, port, connectionTimeout, soTimeout, ssl);
         jedisInvalidationSubscribe = new Jedis(host, port, connectionTimeout, soTimeout, ssl);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -165,7 +175,7 @@ public class CacheJedis extends Jedis {
         super(host, port, connectionTimeout, soTimeout, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
         jedisInvalidationSubscribe = new Jedis(host, port, connectionTimeout, soTimeout, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -173,7 +183,7 @@ public class CacheJedis extends Jedis {
         super(host, port, connectionTimeout, soTimeout, infiniteSoTimeout, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
         jedisInvalidationSubscribe = new Jedis(host, port, connectionTimeout, soTimeout, infiniteSoTimeout, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -181,7 +191,7 @@ public class CacheJedis extends Jedis {
         super(shardInfo);
         jedisInvalidationSubscribe = new Jedis(shardInfo);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -189,7 +199,7 @@ public class CacheJedis extends Jedis {
         super(uri);
         jedisInvalidationSubscribe = new Jedis(uri);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -197,7 +207,7 @@ public class CacheJedis extends Jedis {
         super(uri, sslSocketFactory, sslParameters, hostnameVerifier);
         jedisInvalidationSubscribe = new Jedis(uri, sslSocketFactory, sslParameters, hostnameVerifier);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -205,7 +215,7 @@ public class CacheJedis extends Jedis {
         super(uri, timeout);
         jedisInvalidationSubscribe = new Jedis(uri, timeout);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -213,7 +223,7 @@ public class CacheJedis extends Jedis {
         super(uri, timeout, sslSocketFactory, sslParameters, hostnameVerifier);
         jedisInvalidationSubscribe = new Jedis(uri, timeout, sslSocketFactory, sslParameters, hostnameVerifier);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -221,7 +231,7 @@ public class CacheJedis extends Jedis {
         super(uri, connectionTimeout, soTimeout);
         jedisInvalidationSubscribe = new Jedis(uri, connectionTimeout, soTimeout);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -229,7 +239,7 @@ public class CacheJedis extends Jedis {
         super(uri, connectionTimeout, soTimeout, sslSocketFactory, sslParameters, hostnameVerifier);
         jedisInvalidationSubscribe = new Jedis(uri, connectionTimeout, soTimeout, sslSocketFactory, sslParameters, hostnameVerifier);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -237,7 +247,7 @@ public class CacheJedis extends Jedis {
         super(uri, connectionTimeout, soTimeout, infiniteSoTimeout, sslSocketFactory, sslParameters, hostnameVerifier);
         jedisInvalidationSubscribe = new Jedis(uri, connectionTimeout, soTimeout, infiniteSoTimeout, sslSocketFactory, sslParameters, hostnameVerifier);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -245,7 +255,7 @@ public class CacheJedis extends Jedis {
         super(uri, config);
         jedisInvalidationSubscribe = new Jedis(uri, config);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -253,7 +263,7 @@ public class CacheJedis extends Jedis {
         super(jedisSocketFactory);
         jedisInvalidationSubscribe = new Jedis(jedisSocketFactory);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
 
@@ -261,61 +271,86 @@ public class CacheJedis extends Jedis {
         super(jedisSocketFactory, clientConfig);
         jedisInvalidationSubscribe = new Jedis(jedisSocketFactory, clientConfig);
         clientTracking();
-        pubSubThread();
+        subscribeInvalidationChannel();
         LoadCache();
     }
-    // TODO : If we want to have cache writes , we should have NOLOOP with Broadcasting Mode
-    public void clientTracking() {
+    // TODO : If we want to have cache writes , we should have NOLOOP with Broadcasting Mode @see https://redis.io/topics/client-side-caching
+    private void clientTracking() {
         this.sendCommand(CLIENT , SafeEncoder.encode("TRACKING") , SafeEncoder.encode("on") ,
-                SafeEncoder.encode("REDIRECT") , SafeEncoder.encode(getClientId())); //CLIENT TRACKING REDIRECT ON clientId
+                SafeEncoder.encode("REDIRECT") , SafeEncoder.encode(String.valueOf(jedisInvalidationSubscribe.clientId()))); //CLIENT TRACKING REDIRECT ON clientId
     }
     //Subscribing the pubSub channel in separate thread so that it is non blocking
-    public void pubSubThread() {
+    public void subscribeInvalidationChannel() {
+        startJedisPubSub();
         Runnable runnable = () -> {
-            jedisInvalidationSubscribe.subscribe(jedisPubSub, invalidationChannel);
+                try {
+                    jedisInvalidationSubscribe.subscribe(jedisPubSub, invalidationChannel);
+                } catch (JedisConnectionException j){
+                    System.out.println("Caught JedisConnectionException closing the redirect instance also");
+                    this.close();
+                    cache.cleanUp();
+                }
         };
         Thread threadSub =new Thread(runnable);
-        threadSub.setName("pubSubThread");
+        threadSub.setName("subscribeInvalidationChannelThread");
         threadSub.start();
     }
 
-    public String getClientId() { return String.valueOf(jedisInvalidationSubscribe.clientId()); }
-    public void invalidate(String key) { cache.invalidate(key); }
-    public void cachePut(String key,Object value) { cache.put(key,value); }
-    public Object cacheGet(String key) { return cache.getIfPresent(key); }
-    public void connection() { if(checkConnect()) cache.cleanUp(); } //if connection lost flush the cache
     public long getCacheSize(){ return cache.size(); }
 
     @Override
     public String get(String key) {
-        if(cacheGet(key)!= null) {
-            return String.valueOf(cacheGet(key));
+        Object value = cache.getIfPresent(key);
+        if(value != null) {
+            return String.valueOf(value); //Found in cache
         } else {
-            String value=super.get(key);
-            if(value!=null)
-            cachePut(key,value);
-            return value;
+            String valueServer=super.get(key);
+            if(valueServer!=null)
+                cache.put(key,valueServer); //Getting from server
+            return valueServer;
         }
+    }
+
+    @Override
+    public List<String> mget(String... keys) {
+        List<String> finalValue = new ArrayList<String>();
+        List<String> keysNotInCache = new ArrayList<String>();
+        for(int index = 0 ; index < keys.length ; index++){
+            Object valueCache = cache.getIfPresent(keys[index]);
+            if(valueCache!=null){
+                finalValue.add(String.valueOf(valueCache)); //Directly get the result if available from the cache
+            }else{
+                finalValue.add(null); //Initializing the key values that would be returned from the server as null
+                keysNotInCache.add(keys[index]); //If not in cache add in the parameter send to server
+            }
+        }
+        String[] keysNotInCacheArray = new String[keysNotInCache.size()];
+        keysNotInCacheArray = keysNotInCache.toArray(keysNotInCacheArray); //Converting into compatible parameter for mget command
+        List<String> valuesFromServer;
+        if(keysNotInCacheArray.length!=0) {
+            valuesFromServer = super.mget(keysNotInCacheArray); //Calling from the server
+            int indexValuesFromServer = 0;
+            for (int index = 0; index < keys.length; index++) {
+                if (finalValue.get(index) == null) {
+                    //Adding the values returned from server in the null places to maintain order
+                    finalValue.set(index, valuesFromServer.get(indexValuesFromServer));
+                    cache.put(keys[index], valuesFromServer.get(indexValuesFromServer));
+                    indexValuesFromServer++;
+                }
+            }
+        }
+        return finalValue;
     }
 
     public Boolean boolGet(String key) {
-        if(cacheGet(key)!= null) {
+        if(cache.getIfPresent(key)!= null) {
             return true;
         } else {
             String value=super.get(key);
             if(value!=null)
-                cachePut(key,value);
+                cache.put(key,value);
             return false;
         }
-    }
-
-    //For checking if the connection is active
-    public boolean checkConnect() {
-        jedisPubSub.ping();
-        int flag = jedisPubSub.getSubscribedChannels();
-        if(flag == 1)
-            return true;
-        return false;
     }
 
     //Closing the instances jedisPubSub unsubscribe also closes the jedisSub instance

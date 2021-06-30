@@ -24,6 +24,7 @@ public class BenchmarkingMain {
         int numberOfOperations = Integer.parseInt(props.getProperty("numberOfOperations"));
         int meanOperationTime = Integer.parseInt(props.getProperty("meanOperationTime"));
         double sigmaOperationTime = Double.parseDouble(props.getProperty("sigmaOperationTime"));
+        boolean flag = true;
 
         //Comparing the time elapsed for reads where all reads comprise of cache misses
         SingleReads singleReads = new SingleReads(hostName,portNumber,numberOfKeys);
@@ -35,8 +36,22 @@ public class BenchmarkingMain {
         System.out.println("Cache reads time Taken by normal jedis instance "+cacheReads.JedisTest());
         System.out.println("Cache reads time Taken by CacheJedis instance "+cacheReads.CacheJedisTest());
 
+        //Comparing the time elapsed for mget reads with a mix of server and cache hits
+        ReadsMget readsMget = new ReadsMget(hostName,portNumber,numberOfKeys);
+        System.out.println("mget reads time taken by normal jedis instance "+readsMget.JedisTest());
+        System.out.println("mget reads time taken by normal CacheJedis instance "+readsMget.CacheJedisTest());
+
         //Evaluating various parameters on multi CacheJedis clients Stale values , Cache Misses e.t.c on various parameters
         CountStaleValues countStaleValues = new CountStaleValues(hostName,portNumber,numberOfClients,numberOfKeys,readPercentage,writePercentage,numberOfOperations,meanOperationTime,sigmaOperationTime);
+        Thread thread = Thread.currentThread();
+        //Waiting for all other threads to close
+        while(flag) {
+            thread.sleep(100);
+            if(thread.activeCount()==2){
+                flag=false;
+            }
+        }
+
         System.out.println("Stale values "+countStaleValues.getStaleCount());
         System.out.println("Cache Hits "+countStaleValues.getCacheHit());
         System.out.println("Cache Misses "+countStaleValues.getCacheMiss());

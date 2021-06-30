@@ -47,11 +47,7 @@ public class CountStaleValues {
             Thread thread =new Thread(runnable);
             thread.setName("thread"+i);
             thread.start();
-            try {
-                thread.join(); // Waiting for all threads to complete
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+
         }
     }
     //returns 0 (set) OR 1 (get) depending upon the requirements of reads and writes
