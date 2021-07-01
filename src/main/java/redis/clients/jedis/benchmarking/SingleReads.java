@@ -20,15 +20,17 @@ public class SingleReads {
     }
     private void populateDatabase(){
         Jedis jedis = new Jedis(hostName,portNumber);
-        for(int i=0 ; i<totalKeys ; i++){
-            jedis.set(String.valueOf(i),"hello"+i); //Populating the database with multiple number of keys
+        for(int i = 0 ; i < totalKeys ; i++){
+            //Populating the database with multiple number of keys
+            jedis.set(String.valueOf(i) , "hello"+i);
         }
     }
     public long JedisTest() {
         Jedis jedisInstance = new Jedis(hostName,portNumber);
         begin = Calendar.getInstance().getTimeInMillis();
-        for(int i=0 ; i<totalKeys ; i++){
-            jedisInstance.get(String.valueOf(i)); //Single reads , reads directly from the server
+        for(int i = 0 ; i < totalKeys ; i++){
+            //Single reads , reads directly from the server
+            jedisInstance.get(String.valueOf(i));
         }
         end = Calendar.getInstance().getTimeInMillis();
         jedisInstance.close();
@@ -38,8 +40,9 @@ public class SingleReads {
     public long CacheJedisTest(){
         CacheJedis cacheJedisInstance = new CacheJedis(hostName,portNumber);
         begin = Calendar.getInstance().getTimeInMillis();
-        for(int i=0 ; i<totalKeys ; i++){
-            cacheJedisInstance.get(String.valueOf(i)); //Single reads , reads directly from the server , keys not cached
+        for(int i = 0 ; i < totalKeys ; i++){
+            //Single reads , reads directly from the server , keys not cached
+            cacheJedisInstance.get(String.valueOf(i));
         }
         end = Calendar.getInstance().getTimeInMillis();
         cacheJedisInstance.close();

@@ -12,7 +12,6 @@ public class CountStaleValues {
     private volatile int staleCount = 0;
     private volatile int cacheHit = 0;
     private volatile int totalGet = 0;
-    private int cacheMiss = 0;
     private int reads ;
     private int writes;
     private int totalClients ;
@@ -20,7 +19,8 @@ public class CountStaleValues {
     private int totalOperations;
     private double sigma ;
     private int mean ;
-    private ConcurrentHashMap<String , String> checkStale = new ConcurrentHashMap<>(); //To keep track of the lat client setting the key
+    //To keep track of the last client setting the key
+    private ConcurrentHashMap<String , String> checkStale = new ConcurrentHashMap<>();
     public CountStaleValues(String host,int port,int numberOfClients , int numberOfKeys , int readPercentage , int writePercentage , int numberOfOperations , int meanOperationTime , double sigmaOperationTime) {
         totalClients = numberOfClients;
         reads = readPercentage;
@@ -36,14 +36,15 @@ public class CountStaleValues {
     }
     private void populateDatabase(){
         Jedis jedis = new Jedis(hostName,portNumber);
-        for(int i=0; i<totalKeys ; i++){
-            jedis.set(String.valueOf(i),"hello"+i); //Populate database with multiple keys
+        for(int i = 0 ; i < totalKeys ; i++){
+            //Populate database with multiple keys
+            jedis.set(String.valueOf(i) , "hello"+i);
         }
         jedis.close();
     }
     //Starting multiple cacheJedis instances on multiple threads
     private void cacheJedisThreads()  {
-        for(int i=0; i<totalClients ;i ++){
+        for(int i = 0 ; i < totalClients ; i ++){
             Thread thread =new Thread(runnable);
             thread.setName("thread"+i);
             thread.start();
@@ -68,7 +69,7 @@ public class CountStaleValues {
     private long waitTime(){
         Random rand = new Random();
         long value = (long) (rand.nextGaussian()*sigma+mean);
-        if(value<0){
+        if(value < 0){
             return 0;
         }
         return value;
@@ -83,28 +84,35 @@ public class CountStaleValues {
         CacheJedis cacheJedis = new CacheJedis(hostName,portNumber);
         String clientId = String.valueOf(cacheJedis.clientId());
         Thread thread = Thread.currentThread();
-        for(int i=0;i<totalOperations;i++) {
+
+        for(int i = 0 ; i < totalOperations ; i++) {
             int randomGetSet = getBinaryRandom();
-            if (randomGetSet == 0) { //SET functionality
+            if (randomGetSet == 0) {
+                //SET functionality
                 int randomKey = getRandom() ;
-                cacheJedis.set(String.valueOf(randomKey), "hello" + clientId);
-                checkStale.put(String.valueOf(randomKey), clientId); //Updating the value of clientId writing on the key
-            } else { //GET functionality
+                cacheJedis.set(String.valueOf(randomKey) , "hello" + clientId);
+                //Updating the value of clientId writing on the key
+                checkStale.put(String.valueOf(randomKey) , clientId);
+            } else {
+                //GET functionality
                 incTotalGet();
                 int randomKey = getRandom();
-                Boolean flag = cacheJedis.boolGet(String.valueOf(randomKey)); //Check if the key was accessed from the cache
+                //Check if the key was accessed from the cache
+                Boolean flag = cacheJedis.boolGet(String.valueOf(randomKey));
                 if (flag) {
                     String value = checkStale.get(String.valueOf(randomKey));
-                    incCacheHit(); //key found in cache
-                    if(value!=null) {
-                        if (!(value.equals(clientId))) { //Check if the value was stale
+                    //key found in cache
+                    incCacheHit();
+                    if(value != null) {
+                        //Check if the value was stale
+                        if ( !(value.equals(clientId)) ) {
                             incStaleCount();
                         }
                     }
                 }
             }
             long waitTime = waitTime();
-            if(waitTime<0){
+            if(waitTime < 0){
                 waitTime = 0;
             }
             try {

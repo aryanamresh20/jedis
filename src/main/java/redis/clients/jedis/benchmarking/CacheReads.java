@@ -21,7 +21,7 @@ public class CacheReads {
 
     private void populateDatabase(){
         Jedis jedis = new Jedis(hostName,portNumber);
-        for(int i=0 ; i<totalKeys ; i++) {
+        for(int i = 0 ; i < totalKeys ; i++) {
             jedis.set(String.valueOf(i) , "hello" + i); //Populating the database with multiple keys
         }
     }
@@ -29,9 +29,9 @@ public class CacheReads {
     public long JedisTest() {
         Jedis jedisInstance = new Jedis(hostName,portNumber);
         begin = Calendar.getInstance().getTimeInMillis();
-        for(int i=0 ; i<100 ; i++){
+        for(int i = 0 ; i < 100 ; i++){
             jedisInstance.get(String.valueOf(i)); // Initial Reads , reads directly from the server
-            for(int j=i ; j>=0 ; j--){
+            for(int j = i ; j >= 0 ; j--){
                 jedisInstance.get(String.valueOf(j)); // No Caching available reads from the server creates delays
             }
         }
@@ -43,9 +43,9 @@ public class CacheReads {
     public long CacheJedisTest(){
         CacheJedis cacheJedisInstance = new CacheJedis(hostName,portNumber);
         begin = Calendar.getInstance().getTimeInMillis();
-        for(int i=0 ; i<100 ; i++){
+        for(int i = 0 ; i < 100 ; i++){
             cacheJedisInstance.get(String.valueOf(i)); // Initial Reads , reads directly from the server
-            for(int j=i ; j>=0 ; j--){
+            for(int j = i ; j >= 0 ; j--){
                 cacheJedisInstance.get(String.valueOf(j)); // Cached Reads , reads from the local cache
             }
         }

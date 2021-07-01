@@ -23,19 +23,22 @@ public class ReadsMget {
 
     private void populateDatabase(){
         Jedis jedis = new Jedis(hostName,portNumber);
-        for(int i=0 ; i<totalKeys ; i++) {
-            jedis.set(String.valueOf(i) , "hello" + i); //Populating the database with multiple keys
+        for(int i = 0 ; i < totalKeys ; i++) {
+            //Populating the database with multiple keys
+            jedis.set(String.valueOf(i) , "hello" + i);
         }
     }
 
     public long JedisTest() {
         Jedis jedisInstance = new Jedis(hostName,portNumber);
         begin = Calendar.getInstance().getTimeInMillis();
-        for(int i=0 ; i<100 ; i++){
+        for(int i = 0 ; i < 100 ; i++){
             List<String> mgetInstance = new ArrayList<String>();
-            mgetInstance.add(String.valueOf(i));// Initial Reads ,these keys reads directly from the server
-            for(int j=i ; j>=0 ; j--){
-                mgetInstance.add(String.valueOf(j));// No Caching available these keys also reads from the server creates delays
+            // Initial Reads ,these keys reads directly from the server
+            mgetInstance.add(String.valueOf(i));
+            for(int j = i ; j >= 0 ; j--){
+                // No Caching available these keys also reads from the server creates delays
+                mgetInstance.add(String.valueOf(j));
             }
             String[] mgetInstanceArray = new String[mgetInstance.size()];
             mgetInstanceArray = mgetInstance.toArray(mgetInstanceArray);
@@ -49,11 +52,13 @@ public class ReadsMget {
     public long CacheJedisTest(){
         CacheJedis cacheJedisInstance = new CacheJedis(hostName,portNumber);
         begin = Calendar.getInstance().getTimeInMillis();
-        for(int i=0 ; i<100 ; i++){
+        for(int i = 0 ; i < 100 ; i++){
             List<String> mgetInstance = new ArrayList<String>();
-            mgetInstance.add(String.valueOf(i));// Initial Reads ,these keys reads directly from the server
-            for(int j=i ; j>=0 ; j--){
-                mgetInstance.add(String.valueOf(j));//Caching available these keys reads from the local Cache
+            // Initial Reads ,these keys reads directly from the server
+            mgetInstance.add(String.valueOf(i));
+            for(int j = i ; j >= 0 ; j--){
+                //Caching available these keys reads from the local Cache
+                mgetInstance.add(String.valueOf(j));
             }
             String[] mgetInstanceArray = new String[mgetInstance.size()];
             mgetInstanceArray = mgetInstance.toArray(mgetInstanceArray);

@@ -14,56 +14,21 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
 import static redis.clients.jedis.Protocol.Command.CLIENT;
 
 public class CacheJedis extends Jedis {
-    private volatile Jedis jedisInvalidationSubscribe ; // Jedis instance for receiving invalidation messages
+    private volatile Jedis jedisInvalidationSubscribe; // Jedis instance for receiving invalidation messages
     private final static String invalidationChannel = "__redis__:invalidate";
     private int maxSize = 100;  // Cache max size by default 100
     private int expireAfterAccess = 5 ; // By default 5 minutes of cache to invalidate a key after access
     private int expireAfterWrite = 5 ; // By default 5 minutes of cache to invalidate a key after write
-    private Cache<String, Object> cache;
-    private  JedisPubSub jedisPubSub;
-
-    public void startJedisPubSub()
-    {
-        jedisPubSub = new JedisPubSub() {
-            //Overriding different methods of pub sub to take appropriate actions
-            @Override
-            public void onMessage(String channel, List<Object> message) {
-                //TODO Remove this message in the final Commit
-
-               // System.out.println("Channel " + channel + " has sent a message : " + message);
-                for (Object instance : message) {
-                    cache.invalidate(String.valueOf(instance));///invalidating the keys received from the channel considering as a List
-                }
-            }
-
-            @Override
-            public void onSubscribe(String channel, int subscribedChannels) {
-                //TODO Remove this message in the final Commit
-
-                // System.out.println("Client is Subscribed to channel : " + channel);
-            }
-
-            @Override
-            public void onUnsubscribe(String channel, int subscribedChannels) {
-                //TODO Remove this message in the final Commit
-
-                // System.out.println("Client is Unsubscribed from channel : " + channel);
-            }
-        };
-    }
-    //TODO set various parameters as per the user
-    public void LoadCache() {
-        cache = CacheBuilder.newBuilder()
-                .maximumSize(maxSize)
-                .expireAfterAccess(expireAfterAccess, TimeUnit.MINUTES)
-                .expireAfterWrite(expireAfterWrite,TimeUnit.MINUTES)
-                .build();
-    }
+    private Cache<String , Object> cache;
+    private volatile boolean invalidationChnannelBroken = false;
+    private Object dummyObject = new Object();
+    private JedisPubSub jedisPubSub;
 
     //Different Constructors present in the jedis class implemented in CacheJedis
     public CacheJedis() {
@@ -273,11 +238,22 @@ public class CacheJedis extends Jedis {
         subscribeInvalidationChannel();
         LoadCache();
     }
+
+    //TODO set various parameters as per the user
+    public void LoadCache() {
+        cache = CacheBuilder.newBuilder()
+                .maximumSize(maxSize)
+                .expireAfterAccess(expireAfterAccess, TimeUnit.MINUTES)
+                .expireAfterWrite(expireAfterWrite,TimeUnit.MINUTES)
+                .build();
+    }
+
     // TODO : If we want to have cache writes , we should have NOLOOP with Broadcasting Mode @see https://redis.io/topics/client-side-caching
     private void clientTracking() {
         this.sendCommand(CLIENT , SafeEncoder.encode("TRACKING") , SafeEncoder.encode("on") ,
                 SafeEncoder.encode("REDIRECT") , SafeEncoder.encode(String.valueOf(jedisInvalidationSubscribe.clientId()))); //CLIENT TRACKING REDIRECT ON clientId
     }
+
     //Subscribing the pubSub channel in separate thread so that it is non blocking
     public void subscribeInvalidationChannel() {
         startJedisPubSub();
@@ -285,8 +261,10 @@ public class CacheJedis extends Jedis {
                 try {
                     jedisInvalidationSubscribe.subscribe(jedisPubSub, invalidationChannel);
                 } catch (JedisConnectionException j){
-                    System.out.println("Caught JedisConnectionException closing the redirect instance also");
-                    this.close();
+                    //Caught JedisConnectionException CacheJedis will work as normal Jedis
+                    //Will no more use caching functionality
+                    invalidationChnannelBroken = true;
+                    jedisInvalidationSubscribe.close();
                     cache.cleanUp();
                 }
         };
@@ -297,57 +275,95 @@ public class CacheJedis extends Jedis {
 
     public long getCacheSize(){ return cache.size(); }
 
+    private void putInCache(String key , Object value) {
+        if(!invalidationChnannelBroken){
+            cache.put(key,value);
+        }
+    }
+    private Object getFromCache(String key){
+        if(invalidationChnannelBroken){
+            return null;
+        } else{
+            return cache.getIfPresent(key);
+        }
+    }
     @Override
     public String get(String key) {
-        Object value = cache.getIfPresent(key);
-        if(value != null) {
-            return String.valueOf(value); //Found in cache
-        } else {
-            String valueServer=super.get(key);
-            if(valueServer!=null)
-                cache.put(key,valueServer); //Getting from server
+        Object value = getFromCache(key);
+        if (value != null) {
+            //Found in cache
+            if(value == dummyObject){
+                return null;
+            }else {
+                return String.valueOf(value);
+            }
+        } else {//Getting from server
+            String valueServer = super.get(key);
+            if (valueServer == null){
+                putInCache(key,dummyObject);
+            } else {
+                putInCache(key,valueServer);
+            }
             return valueServer;
         }
     }
 
     @Override
     public List<String> mget(String... keys) {
-        List<String> finalValue = new ArrayList<String>();
-        List<String> keysNotInCache = new ArrayList<String>();
+        List<String> finalValue = new ArrayList<>();
+        List<String> keysNotInCache = new ArrayList<>();
         for(int index = 0 ; index < keys.length ; index++){
-            Object valueCache = cache.getIfPresent(keys[index]);
-            if(valueCache!=null){
-                finalValue.add(String.valueOf(valueCache)); //Directly get the result if available from the cache
+            Object valueCache = getFromCache(keys[index]);
+            if(valueCache != null){
+                //Directly get the result if available from the cache
+                finalValue.add(String.valueOf(valueCache));
             }else{
-                finalValue.add(null); //Initializing the key values that would be returned from the server as null
-                keysNotInCache.add(keys[index]); //If not in cache add in the parameter send to server
+                //Initializing the key values that would be returned from the server as null
+                finalValue.add(null);
+                //If not in cache add in the parameter send to server
+                keysNotInCache.add(keys[index]);
             }
         }
         String[] keysNotInCacheArray = new String[keysNotInCache.size()];
-        keysNotInCacheArray = keysNotInCache.toArray(keysNotInCacheArray); //Converting into compatible parameter for mget command
+        //Converting into compatible parameter for mget command
+        keysNotInCacheArray = keysNotInCache.toArray(keysNotInCacheArray);
         List<String> valuesFromServer;
-        if(keysNotInCacheArray.length!=0) {
-            valuesFromServer = super.mget(keysNotInCacheArray); //Calling from the server
+        if(keysNotInCacheArray.length != 0) {
+            //Calling from the server
+            valuesFromServer = super.mget(keysNotInCacheArray);
             int indexValuesFromServer = 0;
             for (int index = 0; index < keys.length; index++) {
                 if (finalValue.get(index) == null) {
                     //Adding the values returned from server in the null places to maintain order
-                    finalValue.set(index, valuesFromServer.get(indexValuesFromServer));
-                    cache.put(keys[index], valuesFromServer.get(indexValuesFromServer));
+                    String valueAtindex = valuesFromServer.get(indexValuesFromServer);
+                    finalValue.set(index , valueAtindex);
+                    if(valueAtindex == null){
+                        putInCache(keys[index] , dummyObject);
+                    } else {
+                        putInCache(keys[index] , valuesFromServer.get(indexValuesFromServer));
+                    }
                     indexValuesFromServer++;
                 }
+            }
+        }
+        for(int index = 0 ; index < finalValue.size() ; index++){
+            if(finalValue.get(index) != null && finalValue.get(index).equals(String.valueOf(dummyObject))){
+                finalValue.set(index,null);
             }
         }
         return finalValue;
     }
 
     public Boolean boolGet(String key) {
-        if(cache.getIfPresent(key)!= null) {
+        if(getFromCache(key) != null) {
             return true;
         } else {
-            String value=super.get(key);
-            if(value!=null)
-                cache.put(key,value);
+            String value = super.get(key);
+            if(value != null) {
+                putInCache(key , value);
+            } else{
+                putInCache(key , dummyObject);
+            }
             return false;
         }
     }
@@ -357,7 +373,39 @@ public class CacheJedis extends Jedis {
     public void close() {
         super.close();
         cache.cleanUp();
-        jedisPubSub.unsubscribe("__redis__:invalidate");
+        //TODO jedisPubSub.unsubscribe("__redis__:invalidate"); can use this if unsubscribe is thread safe
+        jedisInvalidationSubscribe.close();
+        //This will throw an exception in runnable which will unsubscribe jedisPubSub and will close the instance as well
+    }
+
+    public void startJedisPubSub()
+    {
+        jedisPubSub = new JedisPubSub() {
+            //Overriding different methods of pub sub to take appropriate actions
+            @Override
+            public void onMessage(String channel, List<Object> message) {
+                //TODO Remove this message in the final Commit
+
+                // System.out.println("Channel " + channel + " has sent a message : " + message);
+                for (Object instance : message) {
+                    cache.invalidate(String.valueOf(instance));///invalidating the keys received from the channel considering as a List
+                }
+            }
+
+            @Override
+            public void onSubscribe(String channel, int subscribedChannels) {
+                //TODO Remove this message in the final Commit
+
+                // System.out.println("Client is Subscribed to channel : " + channel);
+            }
+
+            @Override
+            public void onUnsubscribe(String channel, int subscribedChannels) {
+                //TODO Remove this message in the final Commit
+
+                // System.out.println("Client is Unsubscribed from channel : " + channel);
+            }
+        };
     }
 
 }

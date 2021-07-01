@@ -39,7 +39,7 @@ public class BenchmarkingMain {
         //Comparing the time elapsed for mget reads with a mix of server and cache hits
         ReadsMget readsMget = new ReadsMget(hostName,portNumber,numberOfKeys);
         System.out.println("mget reads time taken by normal jedis instance "+readsMget.JedisTest());
-        System.out.println("mget reads time taken by normal CacheJedis instance "+readsMget.CacheJedisTest());
+        System.out.println("mget reads time taken by CacheJedis instance "+readsMget.CacheJedisTest());
 
         //Evaluating various parameters on multi CacheJedis clients Stale values , Cache Misses e.t.c on various parameters
         CountStaleValues countStaleValues = new CountStaleValues(hostName,portNumber,numberOfClients,numberOfKeys,readPercentage,writePercentage,numberOfOperations,meanOperationTime,sigmaOperationTime);
@@ -51,7 +51,6 @@ public class BenchmarkingMain {
                 flag=false;
             }
         }
-
         System.out.println("Stale values "+countStaleValues.getStaleCount());
         System.out.println("Cache Hits "+countStaleValues.getCacheHit());
         System.out.println("Cache Misses "+countStaleValues.getCacheMiss());
