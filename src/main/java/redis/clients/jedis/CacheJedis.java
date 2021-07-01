@@ -57,8 +57,7 @@ public class CacheJedis extends Jedis {
         };
     }
     //TODO set various parameters as per the user
-    public void LoadCache()
-    {
+    public void LoadCache() {
         cache = CacheBuilder.newBuilder()
                 .maximumSize(maxSize)
                 .expireAfterAccess(expireAfterAccess, TimeUnit.MINUTES)
