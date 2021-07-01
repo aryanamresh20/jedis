@@ -5,13 +5,13 @@ import redis.clients.jedis.Jedis;
 
 import java.util.*;
 
-public class ReadsHget {
+public class ReadsHgetAll {
     private String hostName;
     private int portNumber;
     private long begin;
     private long end;
     private int totalKeys;
-    public ReadsHget(String host,int port,int numberOfKeys) {
+    public ReadsHgetAll(String host, int port, int numberOfKeys) {
         hostName = host;
         portNumber = port;
         totalKeys = numberOfKeys;
