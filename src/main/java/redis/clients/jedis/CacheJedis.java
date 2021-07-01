@@ -11,9 +11,7 @@ import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocketFactory;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
@@ -352,6 +350,23 @@ public class CacheJedis extends Jedis {
             }
         }
         return finalValue;
+    }
+
+
+    @Override
+    public Map<String, String> hgetAll(String key) {
+        Object value = getFromCache(key);
+        if (value != null) {
+            //Casting the Object to map
+            Map<String,String> mapValue = Map.class.cast(value);
+            //Found in cache
+            return mapValue;
+        } else {
+            //Getting from server
+            Map<String ,String> valueServer = super.hgetAll(key);
+            putInCache(key , valueServer);
+            return valueServer;
+        }
     }
 
     public Boolean boolGet(String key) {
