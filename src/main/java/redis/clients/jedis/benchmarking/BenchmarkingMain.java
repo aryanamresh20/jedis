@@ -1,13 +1,14 @@
 package redis.clients.jedis.benchmarking;
 
+
+
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Properties;
 
 public class BenchmarkingMain {
 
-    public static void main(String args[]) throws FileNotFoundException,InterruptedException,IOException {
+    public static void main(String args[]) throws InterruptedException,IOException {
         //config file for setting various properties
         String filePath = "/Users/aryanamresh/Documents/jedis/out/artifacts/jedis_jar/config.properties";
         Properties props = new Properties();
@@ -25,7 +26,6 @@ public class BenchmarkingMain {
         int meanOperationTime = Integer.parseInt(props.getProperty("meanOperationTime"));
         double sigmaOperationTime = Double.parseDouble(props.getProperty("sigmaOperationTime"));
         boolean flag = true;
-
         //Comparing the time elapsed for reads where all reads comprise of cache misses
         SingleReads singleReads = new SingleReads(hostName,portNumber,numberOfKeys);
         System.out.println("Single reads time Taken by normal jedis instance "+singleReads.JedisTest());

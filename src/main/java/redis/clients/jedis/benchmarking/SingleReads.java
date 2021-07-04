@@ -1,5 +1,6 @@
 package redis.clients.jedis.benchmarking;
 
+import redis.clients.jedis.CacheConfig;
 import redis.clients.jedis.CacheJedis;
 import redis.clients.jedis.Jedis;
 
@@ -39,6 +40,7 @@ public class SingleReads {
 
     public long CacheJedisTest(){
         CacheJedis cacheJedisInstance = new CacheJedis(hostName,portNumber);
+        cacheJedisInstance.enableCaching();
         begin = Calendar.getInstance().getTimeInMillis();
         for(int i = 0 ; i < totalKeys ; i++){
             //Single reads , reads directly from the server , keys not cached

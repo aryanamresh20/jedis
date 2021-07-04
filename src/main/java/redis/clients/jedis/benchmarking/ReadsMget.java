@@ -1,5 +1,6 @@
 package redis.clients.jedis.benchmarking;
 
+import redis.clients.jedis.CacheConfig;
 import redis.clients.jedis.CacheJedis;
 import redis.clients.jedis.Jedis;
 
@@ -32,7 +33,7 @@ public class ReadsMget {
     public long JedisTest() {
         Jedis jedisInstance = new Jedis(hostName,portNumber);
         begin = Calendar.getInstance().getTimeInMillis();
-        for(int i = 0 ; i < 100 ; i++){
+        for(int i = 0 ; i < totalKeys ; i++){
             List<String> mgetInstance = new ArrayList<String>();
             // Initial Reads ,these keys reads directly from the server
             mgetInstance.add(String.valueOf(i));
@@ -51,8 +52,10 @@ public class ReadsMget {
 
     public long CacheJedisTest(){
         CacheJedis cacheJedisInstance = new CacheJedis(hostName,portNumber);
+        CacheConfig cacheConfig = CacheConfig.Builder.newInstance().maxSize(totalKeys).build();
+        cacheJedisInstance.enableCaching(cacheConfig);
         begin = Calendar.getInstance().getTimeInMillis();
-        for(int i = 0 ; i < 100 ; i++){
+        for(int i = 0 ; i < totalKeys ; i++){
             List<String> mgetInstance = new ArrayList<String>();
             // Initial Reads ,these keys reads directly from the server
             mgetInstance.add(String.valueOf(i));

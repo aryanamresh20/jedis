@@ -1,5 +1,6 @@
 package redis.clients.jedis.benchmarking;
 
+import redis.clients.jedis.CacheConfig;
 import redis.clients.jedis.CacheJedis;
 import redis.clients.jedis.Jedis;
 import java.util.Random;
@@ -82,6 +83,8 @@ public class CountStaleValues {
     //Runnable for each thread
     Runnable runnable = () -> {
         CacheJedis cacheJedis = new CacheJedis(hostName,portNumber);
+        CacheConfig cacheConfig = CacheConfig.Builder.newInstance().maxSize(totalKeys).build();
+        cacheJedis.enableCaching(cacheConfig);
         String clientId = String.valueOf(cacheJedis.clientId());
         Thread thread = Thread.currentThread();
 

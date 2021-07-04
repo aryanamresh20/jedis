@@ -12,6 +12,7 @@ public class CacheJedisMgetTest {
     @Test
     public void testCacheJedisMget() throws InterruptedException{
         CacheJedis cacheJedis = new CacheJedis(); //Cache Jedis Object
+        cacheJedis.enableCaching();
         Jedis jedis = new Jedis(); //Jedis Object
         jedis.mset("foo","bar","happy","birthday","hello","world"); //Populating database with three keys
         List<String> jedisResponse = jedis.mget("foo","happy","hello");

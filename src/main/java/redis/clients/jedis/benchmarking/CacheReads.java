@@ -1,5 +1,6 @@
 package redis.clients.jedis.benchmarking;
 
+import redis.clients.jedis.CacheConfig;
 import redis.clients.jedis.CacheJedis;
 import redis.clients.jedis.Jedis;
 
@@ -29,7 +30,7 @@ public class CacheReads {
     public long JedisTest() {
         Jedis jedisInstance = new Jedis(hostName,portNumber);
         begin = Calendar.getInstance().getTimeInMillis();
-        for(int i = 0 ; i < 100 ; i++){
+        for(int i = 0 ; i < totalKeys ; i++){
             jedisInstance.get(String.valueOf(i)); // Initial Reads , reads directly from the server
             for(int j = i ; j >= 0 ; j--){
                 jedisInstance.get(String.valueOf(j)); // No Caching available reads from the server creates delays
@@ -42,8 +43,10 @@ public class CacheReads {
 
     public long CacheJedisTest(){
         CacheJedis cacheJedisInstance = new CacheJedis(hostName,portNumber);
+        CacheConfig cacheConfig = CacheConfig.Builder.newInstance().maxSize(totalKeys).build();
+        cacheJedisInstance.enableCaching(cacheConfig);
         begin = Calendar.getInstance().getTimeInMillis();
-        for(int i = 0 ; i < 100 ; i++){
+        for(int i = 0 ; i < totalKeys  ; i++){
             cacheJedisInstance.get(String.valueOf(i)); // Initial Reads , reads directly from the server
             for(int j = i ; j >= 0 ; j--){
                 cacheJedisInstance.get(String.valueOf(j)); // Cached Reads , reads from the local cache

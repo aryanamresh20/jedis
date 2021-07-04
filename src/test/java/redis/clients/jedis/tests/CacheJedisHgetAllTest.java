@@ -20,6 +20,7 @@ public class CacheJedisHgetAllTest {
         map.put("hello2","world2");
 
         CacheJedis cacheJedis = new CacheJedis(); //Cache Jedis Object
+        cacheJedis.enableCaching();
         Jedis jedis = new Jedis(); //Jedis Object
         jedis.hset("key" , map); //Populating database with a hashMap
         Map<String , String> jedisResponse = jedis.hgetAll("key");

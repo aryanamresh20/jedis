@@ -11,6 +11,7 @@ public class CacheJedisGetSetTest {
     public void testCacheJedisGetSet() throws InterruptedException {
 
         CacheJedis cacheJedis = new CacheJedis(); //Cached Jedis Object
+        cacheJedis.enableCaching();
         Jedis jedis = new Jedis(); //Simple Jedis Object
         cacheJedis.set("foo","bar");
         assertEquals(0,cacheJedis.getCacheSize()); //Nothing in the cache at starting
