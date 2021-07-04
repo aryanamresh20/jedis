@@ -1,8 +1,8 @@
 package redis.clients.jedis.benchmarking;
 
-import redis.clients.jedis.CacheConfig;
-import redis.clients.jedis.CacheJedis;
+import redis.clients.jedis.CachedJedis;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisCacheConfig;
 
 import java.util.Calendar;
 
@@ -39,15 +39,15 @@ public class SingleReads {
     }
 
     public long CacheJedisTest(){
-        CacheJedis cacheJedisInstance = new CacheJedis(hostName,portNumber);
-        cacheJedisInstance.enableCaching();
+        CachedJedis cachedJedisInstance = new CachedJedis(hostName,portNumber);
+        cachedJedisInstance.setupCaching(JedisCacheConfig.Builder.newBuilder().build());
         begin = Calendar.getInstance().getTimeInMillis();
         for(int i = 0 ; i < totalKeys ; i++){
             //Single reads , reads directly from the server , keys not cached
-            cacheJedisInstance.get(String.valueOf(i));
+            cachedJedisInstance.get(String.valueOf(i));
         }
         end = Calendar.getInstance().getTimeInMillis();
-        cacheJedisInstance.close();
+        cachedJedisInstance.close();
         return (end-begin);
     }
 }

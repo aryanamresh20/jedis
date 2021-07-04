@@ -1,7 +1,7 @@
 package redis.clients.jedis.benchmarking;
 
-import redis.clients.jedis.CacheConfig;
-import redis.clients.jedis.CacheJedis;
+import redis.clients.jedis.JedisCacheConfig;
+import redis.clients.jedis.CachedJedis;
 import redis.clients.jedis.Jedis;
 
 import java.util.*;
@@ -48,20 +48,20 @@ public class ReadsHgetAll {
     }
 
     public long CacheJedisTest(){
-        CacheJedis cacheJedisInstance = new CacheJedis(hostName,portNumber);
-        CacheConfig cacheConfig = CacheConfig.Builder.newInstance().maxSize(totalKeys).build();
-        cacheJedisInstance.enableCaching(cacheConfig);
+        CachedJedis cachedJedisInstance = new CachedJedis(hostName,portNumber);
+        JedisCacheConfig jedisCacheConfig = JedisCacheConfig.Builder.newBuilder().maxCacheSize(totalKeys).build();
+        cachedJedisInstance.setupCaching(jedisCacheConfig);
         begin = Calendar.getInstance().getTimeInMillis();
         for(int i = 0 ; i < totalKeys ; i++){
             // Initial Reads ,these keys reads directly from the server
-            cacheJedisInstance.hgetAll("key"+i);
+            cachedJedisInstance.hgetAll("key"+i);
             for(int j = i ; j >= 0 ; j--){
                 // No Caching available these keys also reads from the server creates delays
-                cacheJedisInstance.hgetAll("key"+j);
+                cachedJedisInstance.hgetAll("key"+j);
             }
         }
         end = Calendar.getInstance().getTimeInMillis();
-        cacheJedisInstance.close();
+        cachedJedisInstance.close();
         return (end-begin);
     }
 }

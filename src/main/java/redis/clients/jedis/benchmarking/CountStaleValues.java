@@ -1,7 +1,7 @@
 package redis.clients.jedis.benchmarking;
 
-import redis.clients.jedis.CacheConfig;
-import redis.clients.jedis.CacheJedis;
+import redis.clients.jedis.JedisCacheConfig;
+import redis.clients.jedis.CachedJedis;
 import redis.clients.jedis.Jedis;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
@@ -82,10 +82,10 @@ public class CountStaleValues {
 
     //Runnable for each thread
     Runnable runnable = () -> {
-        CacheJedis cacheJedis = new CacheJedis(hostName,portNumber);
-        CacheConfig cacheConfig = CacheConfig.Builder.newInstance().maxSize(totalKeys).build();
-        cacheJedis.enableCaching(cacheConfig);
-        String clientId = String.valueOf(cacheJedis.clientId());
+        CachedJedis cachedJedis = new CachedJedis(hostName,portNumber);
+        JedisCacheConfig jedisCacheConfig = JedisCacheConfig.Builder.newBuilder().maxCacheSize(totalKeys).build();
+        cachedJedis.setupCaching(jedisCacheConfig);
+        String clientId = String.valueOf(cachedJedis.clientId());
         Thread thread = Thread.currentThread();
 
         for(int i = 0 ; i < totalOperations ; i++) {
@@ -93,7 +93,7 @@ public class CountStaleValues {
             if (randomGetSet == 0) {
                 //SET functionality
                 int randomKey = getRandom() ;
-                cacheJedis.set(String.valueOf(randomKey) , "hello" + clientId);
+                cachedJedis.set(String.valueOf(randomKey) , "hello" + clientId);
                 //Updating the value of clientId writing on the key
                 checkStale.put(String.valueOf(randomKey) , clientId);
             } else {
@@ -101,7 +101,7 @@ public class CountStaleValues {
                 incTotalGet();
                 int randomKey = getRandom();
                 //Check if the key was accessed from the cache
-                Boolean flag = cacheJedis.boolGet(String.valueOf(randomKey));
+                Boolean flag = cachedJedis.boolGet(String.valueOf(randomKey));
                 if (flag) {
                     String value = checkStale.get(String.valueOf(randomKey));
                     //key found in cache
@@ -124,7 +124,7 @@ public class CountStaleValues {
                 e.printStackTrace();
             }
         }
-        cacheJedis.close();
+        cachedJedis.close();
     };
     public int getStaleCount(){ return staleCount;}
     public int getCacheHit() { return cacheHit;}
