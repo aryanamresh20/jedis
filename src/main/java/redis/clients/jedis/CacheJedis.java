@@ -1,7 +1,10 @@
 package redis.clients.jedis;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.jedis.util.SafeEncoder;
 
@@ -12,239 +15,206 @@ import java.net.URI;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+import static redis.clients.jedis.JedisCacheConfig.TrackingMode.BROADCASTING;
 import static redis.clients.jedis.Protocol.Command.CLIENT;
 
-public class CacheJedis extends Jedis {
-    private volatile Jedis jedisInvalidationSubscribe; // Jedis instance for receiving invalidation messages
-    private final static String invalidationChannel = "__redis__:invalidate";
+/**
+ * Implements two connections mode of server assisted client side caching
+ * https://redis.io/topics/client-side-caching
+ *
+ * This implementation is not thred safe
+ */
+public class CachedJedis extends Jedis {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(CachedJedis.class);
+
+    private static final String INVALIDATION_CHANNEL = "__redis__:invalidate";
+    private static final String POISON_PILL = "__POISON_PILL__";
+    private static final Object DUMMY = new Object();
+
+    private final Jedis invalidationConnection;
     private Cache<String , Object> cache;
-    private volatile boolean invalidationChannelBroken = false;
-    private boolean enableCaching = false;
-    private final Object dummyObject = new Object();
-    private JedisPubSub jedisPubSub;
-    private String clientID;
+    private volatile boolean cachingEnabled;
+    private Long clientId;
 
-    //Different Constructors present in the jedis class implemented in CacheJedis
-    public CacheJedis() {
+    public CachedJedis() {
         super();
-        jedisInvalidationSubscribe = new Jedis();
+        invalidationConnection = new Jedis();
     }
 
-    public CacheJedis(String uri) {
+    public CachedJedis(String uri) {
         super(uri);
-        jedisInvalidationSubscribe = new Jedis(uri);
+        invalidationConnection = new Jedis(uri);
     }
 
-    public CacheJedis(HostAndPort hp) {
+    public CachedJedis(HostAndPort hp) {
         super(hp);
-        jedisInvalidationSubscribe = new Jedis(hp);
+        invalidationConnection = new Jedis(hp);
     }
 
-    public CacheJedis(HostAndPort hp, JedisClientConfig config) {
+    public CachedJedis(HostAndPort hp, JedisClientConfig config) {
         super(hp, config);
-        jedisInvalidationSubscribe = new Jedis(hp, config);
+        invalidationConnection = new Jedis(hp, config);
     }
 
-    public CacheJedis(String host, int port) {
+    public CachedJedis(String host, int port) {
         super(host, port);
-        jedisInvalidationSubscribe = new Jedis(host,port);
+        invalidationConnection = new Jedis(host,port);
     }
 
-    public CacheJedis(String host, int port, boolean ssl) {
+    public CachedJedis(String host, int port, boolean ssl) {
         super(host, port, ssl);
-        jedisInvalidationSubscribe = new Jedis(host, port, ssl);
+        invalidationConnection = new Jedis(host, port, ssl);
     }
 
-    public CacheJedis(String host, int port, boolean ssl, SSLSocketFactory sslSocketFactory, SSLParameters sslParameters, HostnameVerifier hostnameVerifier) {
+    public CachedJedis(String host, int port, boolean ssl, SSLSocketFactory sslSocketFactory,
+                       SSLParameters sslParameters, HostnameVerifier hostnameVerifier) {
         super(host, port, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
-        jedisInvalidationSubscribe = new Jedis(host, port, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
+        invalidationConnection = new Jedis(host, port, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
     }
 
-    public CacheJedis(String host, int port, int timeout) {
+    public CachedJedis(String host, int port, int timeout) {
         super(host, port, timeout);
-        jedisInvalidationSubscribe = new Jedis(host, port, timeout);
+        invalidationConnection = new Jedis(host, port, timeout);
     }
 
-    public CacheJedis(String host, int port, int timeout, boolean ssl) {
+    public CachedJedis(String host, int port, int timeout, boolean ssl) {
         super(host, port, timeout, ssl);
-        jedisInvalidationSubscribe = new Jedis(host, port, timeout, ssl);
+        invalidationConnection = new Jedis(host, port, timeout, ssl);
     }
 
-    public CacheJedis(String host, int port, int timeout, boolean ssl, SSLSocketFactory sslSocketFactory, SSLParameters sslParameters, HostnameVerifier hostnameVerifier) {
+    public CachedJedis(String host, int port, int timeout, boolean ssl, SSLSocketFactory sslSocketFactory,
+                       SSLParameters sslParameters, HostnameVerifier hostnameVerifier) {
         super(host, port, timeout, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
-        jedisInvalidationSubscribe = new Jedis(host, port, timeout, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
+        invalidationConnection = new Jedis(host, port, timeout, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
     }
 
-    public CacheJedis(String host, int port, int connectionTimeout, int soTimeout) {
+    public CachedJedis(String host, int port, int connectionTimeout, int soTimeout) {
         super(host, port, connectionTimeout, soTimeout);
-        jedisInvalidationSubscribe = new Jedis(host, port, connectionTimeout, soTimeout);
+        invalidationConnection = new Jedis(host, port, connectionTimeout, soTimeout);
     }
 
-    public CacheJedis(String host, int port, int connectionTimeout, int soTimeout, int infiniteSoTimeout) {
+    public CachedJedis(String host, int port, int connectionTimeout, int soTimeout, int infiniteSoTimeout) {
         super(host, port, connectionTimeout, soTimeout, infiniteSoTimeout);
-        jedisInvalidationSubscribe = new Jedis(host, port, connectionTimeout, soTimeout, infiniteSoTimeout);
+        invalidationConnection = new Jedis(host, port, connectionTimeout, soTimeout, infiniteSoTimeout);
     }
 
-    public CacheJedis(String host, int port, int connectionTimeout, int soTimeout, boolean ssl) {
+    public CachedJedis(String host, int port, int connectionTimeout, int soTimeout, boolean ssl) {
         super(host, port, connectionTimeout, soTimeout, ssl);
-        jedisInvalidationSubscribe = new Jedis(host, port, connectionTimeout, soTimeout, ssl);
+        invalidationConnection = new Jedis(host, port, connectionTimeout, soTimeout, ssl);
     }
 
-    public CacheJedis(String host, int port, int connectionTimeout, int soTimeout, boolean ssl, SSLSocketFactory sslSocketFactory, SSLParameters sslParameters, HostnameVerifier hostnameVerifier) {
+    public CachedJedis(String host, int port, int connectionTimeout, int soTimeout, boolean ssl,
+                       SSLSocketFactory sslSocketFactory, SSLParameters sslParameters, HostnameVerifier hostnameVerifier) {
         super(host, port, connectionTimeout, soTimeout, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
-        jedisInvalidationSubscribe = new Jedis(host, port, connectionTimeout, soTimeout, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
+        invalidationConnection = new Jedis(host, port, connectionTimeout, soTimeout, ssl,
+                                           sslSocketFactory, sslParameters, hostnameVerifier);
     }
 
-    public CacheJedis(String host, int port, int connectionTimeout, int soTimeout, int infiniteSoTimeout, boolean ssl, SSLSocketFactory sslSocketFactory, SSLParameters sslParameters, HostnameVerifier hostnameVerifier) {
+    public CachedJedis(String host, int port, int connectionTimeout, int soTimeout, int infiniteSoTimeout, boolean ssl,
+                       SSLSocketFactory sslSocketFactory, SSLParameters sslParameters, HostnameVerifier hostnameVerifier) {
         super(host, port, connectionTimeout, soTimeout, infiniteSoTimeout, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
-        jedisInvalidationSubscribe = new Jedis(host, port, connectionTimeout, soTimeout, infiniteSoTimeout, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
+        invalidationConnection = new Jedis(host, port, connectionTimeout, soTimeout, infiniteSoTimeout,
+                                           ssl, sslSocketFactory, sslParameters, hostnameVerifier);
     }
 
-    public CacheJedis(JedisShardInfo shardInfo) {
+    public CachedJedis(JedisShardInfo shardInfo) {
         super(shardInfo);
-        jedisInvalidationSubscribe = new Jedis(shardInfo);
+        invalidationConnection = new Jedis(shardInfo);
     }
 
-    public CacheJedis(URI uri) {
+    public CachedJedis(URI uri) {
         super(uri);
-        jedisInvalidationSubscribe = new Jedis(uri);
+        invalidationConnection = new Jedis(uri);
     }
 
-    public CacheJedis(URI uri, SSLSocketFactory sslSocketFactory, SSLParameters sslParameters, HostnameVerifier hostnameVerifier) {
+    public CachedJedis(URI uri, SSLSocketFactory sslSocketFactory, SSLParameters sslParameters, HostnameVerifier hostnameVerifier) {
         super(uri, sslSocketFactory, sslParameters, hostnameVerifier);
-        jedisInvalidationSubscribe = new Jedis(uri, sslSocketFactory, sslParameters, hostnameVerifier);
+        invalidationConnection = new Jedis(uri, sslSocketFactory, sslParameters, hostnameVerifier);
     }
 
-    public CacheJedis(URI uri, int timeout) {
+    public CachedJedis(URI uri, int timeout) {
         super(uri, timeout);
-        jedisInvalidationSubscribe = new Jedis(uri, timeout);
+        invalidationConnection = new Jedis(uri, timeout);
     }
 
-    public CacheJedis(URI uri, int timeout, SSLSocketFactory sslSocketFactory, SSLParameters sslParameters, HostnameVerifier hostnameVerifier) {
+    public CachedJedis(URI uri, int timeout, SSLSocketFactory sslSocketFactory, SSLParameters sslParameters,
+                       HostnameVerifier hostnameVerifier) {
         super(uri, timeout, sslSocketFactory, sslParameters, hostnameVerifier);
-        jedisInvalidationSubscribe = new Jedis(uri, timeout, sslSocketFactory, sslParameters, hostnameVerifier);
+        invalidationConnection = new Jedis(uri, timeout, sslSocketFactory, sslParameters, hostnameVerifier);
     }
 
-    public CacheJedis(URI uri, int connectionTimeout, int soTimeout) {
+    public CachedJedis(URI uri, int connectionTimeout, int soTimeout) {
         super(uri, connectionTimeout, soTimeout);
-        jedisInvalidationSubscribe = new Jedis(uri, connectionTimeout, soTimeout);
+        invalidationConnection = new Jedis(uri, connectionTimeout, soTimeout);
     }
 
-    public CacheJedis(URI uri, int connectionTimeout, int soTimeout, SSLSocketFactory sslSocketFactory, SSLParameters sslParameters, HostnameVerifier hostnameVerifier) {
+    public CachedJedis(URI uri, int connectionTimeout, int soTimeout, SSLSocketFactory sslSocketFactory,
+                       SSLParameters sslParameters, HostnameVerifier hostnameVerifier) {
         super(uri, connectionTimeout, soTimeout, sslSocketFactory, sslParameters, hostnameVerifier);
-        jedisInvalidationSubscribe = new Jedis(uri, connectionTimeout, soTimeout, sslSocketFactory, sslParameters, hostnameVerifier);
+        invalidationConnection = new Jedis(uri, connectionTimeout, soTimeout, sslSocketFactory, sslParameters, hostnameVerifier);
     }
 
-    public CacheJedis(URI uri, int connectionTimeout, int soTimeout, int infiniteSoTimeout, SSLSocketFactory sslSocketFactory, SSLParameters sslParameters, HostnameVerifier hostnameVerifier) {
+    public CachedJedis(URI uri, int connectionTimeout, int soTimeout, int infiniteSoTimeout
+        , SSLSocketFactory sslSocketFactory, SSLParameters sslParameters, HostnameVerifier hostnameVerifier) {
         super(uri, connectionTimeout, soTimeout, infiniteSoTimeout, sslSocketFactory, sslParameters, hostnameVerifier);
-        jedisInvalidationSubscribe = new Jedis(uri, connectionTimeout, soTimeout, infiniteSoTimeout, sslSocketFactory, sslParameters, hostnameVerifier);
+        invalidationConnection = new Jedis(uri, connectionTimeout, soTimeout, infiniteSoTimeout,
+                                           sslSocketFactory, sslParameters, hostnameVerifier);
     }
 
-    public CacheJedis(URI uri, JedisClientConfig config) {
+    public CachedJedis(URI uri, JedisClientConfig config) {
         super(uri, config);
-        jedisInvalidationSubscribe = new Jedis(uri, config);
+        invalidationConnection = new Jedis(uri, config);
     }
 
-    public CacheJedis(JedisSocketFactory jedisSocketFactory) {
+    public CachedJedis(JedisSocketFactory jedisSocketFactory) {
         super(jedisSocketFactory);
-        jedisInvalidationSubscribe = new Jedis(jedisSocketFactory);
+        invalidationConnection = new Jedis(jedisSocketFactory);
     }
 
-    public CacheJedis(JedisSocketFactory jedisSocketFactory, JedisClientConfig clientConfig) {
+    public CachedJedis(JedisSocketFactory jedisSocketFactory, JedisClientConfig clientConfig) {
         super(jedisSocketFactory, clientConfig);
-        jedisInvalidationSubscribe = new Jedis(jedisSocketFactory, clientConfig);
+        invalidationConnection = new Jedis(jedisSocketFactory, clientConfig);
     }
 
-    public void enableCaching(CacheConfig cacheConfig){
-        enableCaching = true;
+    public void setupCaching(JedisCacheConfig jedisCacheConfig) {
+        if (jedisCacheConfig.isNoLoop() ||
+            jedisCacheConfig.isOptInCaching() ||
+            jedisCacheConfig.getTrackingMode() == BROADCASTING) {
+            throw new UnsupportedOperationException("Config options not yet supported");
+        }
+        cachingEnabled = true;
+        initClientTracking(jedisCacheConfig);
         cache = CacheBuilder.newBuilder()
-                .maximumSize(cacheConfig.getMaxSize())
-                .expireAfterAccess(cacheConfig.getExpireAfterAccess(), cacheConfig.getUnit())
-                .expireAfterWrite(cacheConfig.getExpireAfterWrite(), cacheConfig.getUnit())
+                .maximumSize(jedisCacheConfig.getMaxCacheSize())
+                .expireAfterAccess(jedisCacheConfig.getExpireAfterAccessMillis(), TimeUnit.MILLISECONDS)
+                .expireAfterWrite(jedisCacheConfig.getExpireAfterWriteMillis(), TimeUnit.MILLISECONDS)
                 .build();
-        clientTracking();
-        subscribeInvalidationChannel();
+        setupInvalidationPubSub();
     }
 
-    public void enableCaching(){
-        enableCaching = true;
-        cache = CacheBuilder.newBuilder()
-                .maximumSize(100)
-                .expireAfterAccess(5, TimeUnit.MINUTES)
-                .expireAfterWrite(5,TimeUnit.MINUTES)
-                .build();
-        clientTracking();
-        subscribeInvalidationChannel();
-    }
-
-
-
-    // TODO : If we want to have cache writes , we should have NOLOOP with Broadcasting Mode @see https://redis.io/topics/client-side-caching
-    private void clientTracking() {
-        this.sendCommand(CLIENT , SafeEncoder.encode("TRACKING") , SafeEncoder.encode("on") ,
-                SafeEncoder.encode("REDIRECT") , SafeEncoder.encode(String.valueOf(jedisInvalidationSubscribe.clientId()))); //CLIENT TRACKING REDIRECT ON clientId
-    }
-
-    //Subscribing the pubSub channel in separate thread so that it is non blocking
-    public void subscribeInvalidationChannel() {
-        clientID = String.valueOf(this.clientId());
-        startJedisPubSub();
-        Runnable runnable = () -> {
-                try {
-                    jedisInvalidationSubscribe.subscribe(jedisPubSub, invalidationChannel);
-                } catch (JedisConnectionException j){
-                    invalidationChannelBroken = true;
-                    jedisInvalidationSubscribe.close();
-                    cache.cleanUp();
-                }
-        };
-        Thread threadSub =new Thread(runnable);
-        threadSub.setName("subscribeInvalidationChannelThread");
-        threadSub.start();
-    }
-
-    public long getCacheSize() {
-        if (enableCaching) {
-            return cache.size();
-        }else{
-            return 0;
-        }
-    }
-
-    private void putInCache(String key , Object value) {
-        if(!invalidationChannelBroken){
-            cache.put(key,value);
-        }
-    }
-    private Object getFromCache(String key){
-        if(invalidationChannelBroken){
-            return null;
-        } else{
-            return cache.getIfPresent(key);
-        }
-    }
     @Override
     public String get(String key) {
         checkIsInMultiOrPipeline();
-        if(enableCaching) {
-            Object value = getFromCache(key);
-            if (value != null) {
+        if(cachingEnabled) {
+            Object cachedValue = getFromCache(key);
+            if (cachedValue != null) {
                 //Found in cache
-                if (value == dummyObject) {
+                if (cachedValue == DUMMY) {
                     return null;
-                } else {
-                    return String.valueOf(value);
                 }
-            } else {//Getting from server
-                String valueServer = super.get(key);
-                if (valueServer == null) {
-                    putInCache(key, dummyObject);
+                return String.valueOf(cachedValue);
+            } else {
+                //Getting from server
+                String valueFromServer = super.get(key);
+                if (valueFromServer == null) {
+                    putInCache(key, DUMMY);
                 } else {
-                    putInCache(key, valueServer);
+                    putInCache(key, valueFromServer);
                 }
-                return valueServer;
+                return valueFromServer;
             }
-        }else{
+        } else {
             return super.get(key);
         }
     }
@@ -252,24 +222,23 @@ public class CacheJedis extends Jedis {
     @Override
     public List<String> mget(String... keys) {
         checkIsInMultiOrPipeline();
-        if(enableCaching) {
+        if(cachingEnabled) {
             List<String> finalValue = new ArrayList<>();
             List<String> keysNotInCache = new ArrayList<>();
-            for (int index = 0; index < keys.length; index++) {
-                Object valueCache = getFromCache(keys[index]);
-                if (valueCache != null) {
+            for (String key : keys) {
+                Object cachedValue = getFromCache(key);
+                if (cachedValue != null) {
                     //Directly get the result if available from the cache
-                    finalValue.add(String.valueOf(valueCache));
+                    finalValue.add(String.valueOf(cachedValue));
                 } else {
                     //Initializing the key values that would be returned from the server as null
                     finalValue.add(null);
                     //If not in cache add in the parameter send to server
-                    keysNotInCache.add(keys[index]);
+                    keysNotInCache.add(key);
                 }
             }
-            String[] keysNotInCacheArray = new String[keysNotInCache.size()];
             //Converting into compatible parameter for mget command
-            keysNotInCacheArray = keysNotInCache.toArray(keysNotInCacheArray);
+            String[] keysNotInCacheArray = keysNotInCache.toArray(new String[0]);
             List<String> valuesFromServer;
             if (keysNotInCacheArray.length != 0) {
                 //Calling from the server
@@ -281,7 +250,7 @@ public class CacheJedis extends Jedis {
                         String valueAtindex = valuesFromServer.get(indexValuesFromServer);
                         finalValue.set(index, valueAtindex);
                         if (valueAtindex == null) {
-                            putInCache(keys[index], dummyObject);
+                            putInCache(keys[index], DUMMY);
                         } else {
                             putInCache(keys[index], valuesFromServer.get(indexValuesFromServer));
                         }
@@ -290,40 +259,60 @@ public class CacheJedis extends Jedis {
                 }
             }
             for (int index = 0; index < finalValue.size(); index++) {
-                if (finalValue.get(index) != null && finalValue.get(index).equals(String.valueOf(dummyObject))) {
+                if (finalValue.get(index) != null && finalValue.get(index).equals(String.valueOf(DUMMY))) {
                     finalValue.set(index, null);
                 }
             }
             return finalValue;
-        }else{
+        } else {
             return super.mget(keys);
         }
     }
 
-
     @Override
     public Map<String, String> hgetAll(String key) {
         checkIsInMultiOrPipeline();
-        if(enableCaching) {
-            Object value = getFromCache(key);
-            if (value != null) {
-                //Casting the Object to map
-                Map<String, String> mapValue = Map.class.cast(value);
-                //Found in cache
-                return mapValue;
+        if(cachingEnabled) {
+            Object cachedValue = getFromCache(key);
+            if (cachedValue != null) {
+                if (cachedValue == DUMMY) {
+                    return null;
+                }
+                // noinspection unchecked
+                return (Map<String, String>) cachedValue;
             } else {
-                //Getting from server
-                Map<String, String> valueServer = super.hgetAll(key);
-                putInCache(key, valueServer);
-                return valueServer;
+                Map<String, String> valueFromServer = super.hgetAll(key);
+                if (valueFromServer == null) {
+                    putInCache(key, DUMMY);
+                } else {
+                    putInCache(key, valueFromServer);
+                }
+                return valueFromServer;
             }
-        }else{
+        } else {
             return super.hgetAll(key);
         }
     }
 
+    @Override
+    public String quit() {
+        if(cachingEnabled) {
+            pushPoisonPill();
+        }
+        return super.quit();
+    }
+
+    @Override
+    public void close() {
+        if(cachingEnabled) {
+            pushPoisonPill();
+        }
+        super.close();
+    }
+
+    @VisibleForTesting
     public Boolean boolGet(String key) {
-        if(enableCaching) {
+        if(cachingEnabled) {
             if (getFromCache(key) != null) {
                 return true;
             } else {
@@ -331,63 +320,103 @@ public class CacheJedis extends Jedis {
                 if (value != null) {
                     putInCache(key , value);
                 } else {
-                    putInCache(key , dummyObject);
+                    putInCache(key , DUMMY);
                 }
                 return false;
             }
-        }else{
+        } else {
             return false;
         }
     }
 
-    //Closing the instances jedisPubSub unsubscribe also closes the jedisSub instance
-    @Override
-    public void close() {
-        if(enableCaching) {
-            this.publish("__redis__:invalidate" , "close" + clientID); //unsubscribing the invalidation channel
-            cache.cleanUp();
+    // --------------------------------------------- Private Methods -------------------------------------------------
+
+    @VisibleForTesting
+    public long getCacheSize() {
+        if (cachingEnabled) {
+            return cache.size();
+        } else {
+            return 0;
         }
-        super.close();
     }
 
-    public void startJedisPubSub()
-    {
-        jedisPubSub = new JedisPubSub() {
-            //Overriding different methods of pub sub to take appropriate actions
+    private void putInCache(String key , Object value) {
+        if(cachingEnabled) {
+            cache.put(key,value);
+        }
+    }
 
+    private Object getFromCache(String key){
+        if(!cachingEnabled) {
+            return null;
+        } else {
+            return cache.getIfPresent(key);
+        }
+    }
+
+    private void initClientTracking(JedisCacheConfig jedisCacheConfig) {
+        if (invalidationConnection == null) {
+            throw new IllegalArgumentException("Invalidation connection is not yet initialized");
+        }
+
+        clientId = invalidationConnection.clientId();
+        switch (jedisCacheConfig.getTrackingMode()) {
+            case DEFAULT:
+                //CLIENT TRACKING REDIRECT ON clientId
+                byte[][] clientTrackingArgs = new byte[][]{
+                    SafeEncoder.encode("TRACKING"),
+                    SafeEncoder.encode("ON"),
+                    SafeEncoder.encode("REDIRECT"),
+                    SafeEncoder.encode(String.valueOf(invalidationConnection.clientId()))
+                };
+                this.sendCommand(CLIENT, clientTrackingArgs);
+                break;
+            case BROADCASTING:
+                throw new UnsupportedOperationException("Broadcasting mode is not yet supported");
+        }
+    }
+
+    private void setupInvalidationPubSub() {
+        JedisPubSub pubSubInstance = createPubSubInstance();
+        Runnable runnable = () -> {
+            try {
+                // blocking
+                invalidationConnection.subscribe(pubSubInstance, INVALIDATION_CHANNEL);
+            } catch (Exception eX){
+                LOGGER.error("[CACHED_JEDIS_EXCEPTION] Invalidation connection threw exception", eX);
+            }
+            cachingEnabled = false;
+            invalidationConnection.quit();
+            invalidationConnection.close();
+            cache.cleanUp();
+        };
+        Thread thread = new Thread(runnable);
+        thread.setName("JEDIS_INVALIDATION_CONNECTION_" + clientId);
+        thread.start();
+    }
+
+    private JedisPubSub createPubSubInstance() {
+        return new JedisPubSub() {
             @Override
             public void onMessage(String channel, String message) {
-                String closeMessage = "close"+clientID;
-                if(channel.equals(invalidationChannel) && closeMessage.equals(message)) {
-                    unsubscribe(invalidationChannel);
+                String poisonMessage = POISON_PILL + clientId;
+                if(channel.equals(INVALIDATION_CHANNEL) && poisonMessage.equals(message)) {
+                    unsubscribe(INVALIDATION_CHANNEL);
                 }
             }
 
             @Override
             public void onMessage(String channel, List<Object> message) {
-                //TODO Remove this message in the final Commit
-
-                //System.out.println("Channel " + channel + " has sent a message : " + message);
                 for (Object instance : message) {
-                    cache.invalidate(String.valueOf(instance));///invalidating the keys received from the channel considering as a List
+                    cache.invalidate(String.valueOf(instance));
                 }
-            }
-
-            @Override
-            public void onSubscribe(String channel, int subscribedChannels) {
-                //TODO Remove this message in the final Commit
-
-                // System.out.println("Client is Subscribed to channel : " + channel);
-            }
-
-            @Override
-            public void onUnsubscribe(String channel, int subscribedChannels) {
-                //TODO Remove this message in the final Commit
-
-                // System.out.println("Client is Unsubscribed from channel : " + channel);
             }
         };
     }
 
+    private void pushPoisonPill() {
+        //unsubscribing the invalidation channel
+        this.publish(INVALIDATION_CHANNEL , POISON_PILL + clientId);
+    }
 }
 

@@ -29,24 +29,24 @@ public class BenchmarkingMain {
         //Comparing the time elapsed for reads where all reads comprise of cache misses
         SingleReads singleReads = new SingleReads(hostName,portNumber,numberOfKeys);
         System.out.println("Single reads time Taken by normal jedis instance "+singleReads.JedisTest());
-        System.out.println("Single reads time Taken by CacheJedis instance "+singleReads.CacheJedisTest());
+        System.out.println("Single reads time Taken by CachedJedis instance "+singleReads.CacheJedisTest());
 
         //Comparing the time elapsed for reads where most of the reads are from the cache
         CacheReads cacheReads = new CacheReads(hostName,portNumber,numberOfKeys);
         System.out.println("Cache reads time Taken by normal jedis instance "+cacheReads.JedisTest());
-        System.out.println("Cache reads time Taken by CacheJedis instance "+cacheReads.CacheJedisTest());
+        System.out.println("Cache reads time Taken by CachedJedis instance "+cacheReads.CacheJedisTest());
 
         //Comparing the time elapsed for mget reads with a mix of server and cache hits
         ReadsMget readsMget = new ReadsMget(hostName,portNumber,numberOfKeys);
         System.out.println("mget reads time taken by normal jedis instance "+readsMget.JedisTest());
-        System.out.println("mget reads time taken by CacheJedis instance "+readsMget.CacheJedisTest());
+        System.out.println("mget reads time taken by CachedJedis instance "+readsMget.CacheJedisTest());
 
         //Comparing the time elapsed for hget reads with a mix of server and cache hits
         ReadsHgetAll readsHgetAll = new ReadsHgetAll(hostName,portNumber,numberOfKeys);
         System.out.println("hget reads time taken by normal jedis instance "+ readsHgetAll.JedisTest());
-        System.out.println("hget reads time taken by CacheJedis instance "+ readsHgetAll.CacheJedisTest());
+        System.out.println("hget reads time taken by CachedJedis instance "+ readsHgetAll.CacheJedisTest());
 
-        //Evaluating various parameters on multi CacheJedis clients Stale values , Cache Misses e.t.c on various parameters
+        //Evaluating various parameters on multi CachedJedis clients Stale values , Cache Misses e.t.c on various parameters
         CountStaleValues countStaleValues = new CountStaleValues(hostName,portNumber,numberOfClients,numberOfKeys,readPercentage,writePercentage,numberOfOperations,meanOperationTime,sigmaOperationTime);
         Thread thread = Thread.currentThread();
         //Waiting for all other threads to close

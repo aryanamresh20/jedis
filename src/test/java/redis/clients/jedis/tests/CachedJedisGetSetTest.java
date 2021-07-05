@@ -1,22 +1,24 @@
 package redis.clients.jedis.tests;
 
 import org.junit.Test;
-import redis.clients.jedis.CacheJedis;
+import redis.clients.jedis.CachedJedis;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisCacheConfig;
+
 import static org.junit.Assert.assertEquals;
 
-public class CacheJedisGetSetTest {
+public class CachedJedisGetSetTest {
 
     @Test
     public void testCacheJedisGetSet() throws InterruptedException {
 
-        CacheJedis cacheJedis = new CacheJedis(); //Cached Jedis Object
-        cacheJedis.enableCaching();
+        CachedJedis cachedJedis = new CachedJedis(); //Cached Jedis Object
+        cachedJedis.setupCaching(JedisCacheConfig.Builder.newBuilder().build());
         Jedis jedis = new Jedis(); //Simple Jedis Object
-        cacheJedis.set("foo","bar");
-        assertEquals(0,cacheJedis.getCacheSize()); //Nothing in the cache at starting
-        cacheJedis.get("foo");
-        assertEquals(1,cacheJedis.getCacheSize()); //Key foo cached in the cache
+        cachedJedis.set("foo","bar");
+        assertEquals(0, cachedJedis.getCacheSize()); //Nothing in the cache at starting
+        cachedJedis.get("foo");
+        assertEquals(1, cachedJedis.getCacheSize()); //Key foo cached in the cache
         jedis.set("foo","new foo"); //Another Client changes the value of foo to generate invalidation message
         Thread thread = Thread.currentThread();
         //Pausing the main thread to let cache invalidate the message
@@ -25,8 +27,8 @@ public class CacheJedisGetSetTest {
         }
         catch(InterruptedException e) {
         }
-        assertEquals(0,cacheJedis.getCacheSize()); //Key foo invalidated from the cache
-        cacheJedis.close();
+        assertEquals(0, cachedJedis.getCacheSize()); //Key foo invalidated from the cache
+        cachedJedis.close();
         jedis.close();
 
     }

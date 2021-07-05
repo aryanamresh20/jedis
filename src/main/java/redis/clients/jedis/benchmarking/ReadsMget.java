@@ -1,7 +1,7 @@
 package redis.clients.jedis.benchmarking;
 
-import redis.clients.jedis.CacheConfig;
-import redis.clients.jedis.CacheJedis;
+import redis.clients.jedis.JedisCacheConfig;
+import redis.clients.jedis.CachedJedis;
 import redis.clients.jedis.Jedis;
 
 import java.util.ArrayList;
@@ -51,9 +51,9 @@ public class ReadsMget {
     }
 
     public long CacheJedisTest(){
-        CacheJedis cacheJedisInstance = new CacheJedis(hostName,portNumber);
-        CacheConfig cacheConfig = CacheConfig.Builder.newInstance().maxSize(totalKeys).build();
-        cacheJedisInstance.enableCaching(cacheConfig);
+        CachedJedis cachedJedisInstance = new CachedJedis(hostName,portNumber);
+        JedisCacheConfig jedisCacheConfig = JedisCacheConfig.Builder.newBuilder().maxCacheSize(totalKeys).build();
+        cachedJedisInstance.setupCaching(jedisCacheConfig);
         begin = Calendar.getInstance().getTimeInMillis();
         for(int i = 0 ; i < totalKeys ; i++){
             List<String> mgetInstance = new ArrayList<String>();
@@ -65,10 +65,10 @@ public class ReadsMget {
             }
             String[] mgetInstanceArray = new String[mgetInstance.size()];
             mgetInstanceArray = mgetInstance.toArray(mgetInstanceArray);
-            cacheJedisInstance.mget(mgetInstanceArray);
+            cachedJedisInstance.mget(mgetInstanceArray);
         }
         end = Calendar.getInstance().getTimeInMillis();
-        cacheJedisInstance.close();
+        cachedJedisInstance.close();
         return (end-begin);
     }
 }

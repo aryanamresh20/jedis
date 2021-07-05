@@ -1,7 +1,7 @@
 package redis.clients.jedis.benchmarking;
 
-import redis.clients.jedis.CacheConfig;
-import redis.clients.jedis.CacheJedis;
+import redis.clients.jedis.JedisCacheConfig;
+import redis.clients.jedis.CachedJedis;
 import redis.clients.jedis.Jedis;
 
 import java.util.Calendar;
@@ -42,18 +42,18 @@ public class CacheReads {
     }
 
     public long CacheJedisTest(){
-        CacheJedis cacheJedisInstance = new CacheJedis(hostName,portNumber);
-        CacheConfig cacheConfig = CacheConfig.Builder.newInstance().maxSize(totalKeys).build();
-        cacheJedisInstance.enableCaching(cacheConfig);
+        CachedJedis cachedJedisInstance = new CachedJedis(hostName,portNumber);
+        JedisCacheConfig jedisCacheConfig = JedisCacheConfig.Builder.newBuilder().maxCacheSize(totalKeys).build();
+        cachedJedisInstance.setupCaching(jedisCacheConfig);
         begin = Calendar.getInstance().getTimeInMillis();
         for(int i = 0 ; i < totalKeys  ; i++){
-            cacheJedisInstance.get(String.valueOf(i)); // Initial Reads , reads directly from the server
+            cachedJedisInstance.get(String.valueOf(i)); // Initial Reads , reads directly from the server
             for(int j = i ; j >= 0 ; j--){
-                cacheJedisInstance.get(String.valueOf(j)); // Cached Reads , reads from the local cache
+                cachedJedisInstance.get(String.valueOf(j)); // Cached Reads , reads from the local cache
             }
         }
         end = Calendar.getInstance().getTimeInMillis();
-        cacheJedisInstance.close();
+        cachedJedisInstance.close();
         return (end-begin);
     }
 }
