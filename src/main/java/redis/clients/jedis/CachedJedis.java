@@ -276,13 +276,13 @@ public class CachedJedis extends Jedis {
             Object cachedValue = getFromCache(key);
             if (cachedValue != null) {
                 if (cachedValue == DUMMY) {
-                    return null;
+                    return new HashMap<>();
                 }
                 // noinspection unchecked
                 return (Map<String, String>) cachedValue;
             } else {
                 Map<String, String> valueFromServer = super.hgetAll(key);
-                if (valueFromServer == null) {
+                if (valueFromServer.size() == 0) {
                     putInCache(key, DUMMY);
                 } else {
                     putInCache(key, valueFromServer);
