@@ -10,12 +10,12 @@ import java.util.List;
 
 public class ReadsMget {
 
-    private String hostName;
-    private int portNumber;
+    private final String hostName;
+    private final int portNumber;
     private long begin;
     private long end;
-    private int totalKeys;
-    public ReadsMget(String host,int port,int numberOfKeys) {
+    private final long totalKeys;
+    public ReadsMget(String host,int port,long numberOfKeys) {
         hostName = host;
         portNumber = port;
         totalKeys = numberOfKeys;
@@ -52,7 +52,11 @@ public class ReadsMget {
 
     public long CacheJedisTest(){
         CachedJedis cachedJedisInstance = new CachedJedis(hostName,portNumber);
-        JedisCacheConfig jedisCacheConfig = JedisCacheConfig.Builder.newBuilder().maxCacheSize(totalKeys).build();
+        JedisCacheConfig jedisCacheConfig = JedisCacheConfig.Builder.newBuilder()
+                .maxCacheSize(totalKeys*2)
+                .expireAfterAccess(1000)
+                .expireAfterWrite(1000)
+                .build();
         cachedJedisInstance.setupCaching(jedisCacheConfig);
         begin = Calendar.getInstance().getTimeInMillis();
         for(int i = 0 ; i < totalKeys ; i++){

@@ -411,6 +411,7 @@ public class CachedJedis extends Jedis {
                     cache.invalidate(String.valueOf(instance));
                 }
             }
+
         };
     }
 

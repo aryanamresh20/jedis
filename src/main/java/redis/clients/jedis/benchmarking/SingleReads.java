@@ -8,12 +8,12 @@ import java.util.Calendar;
 
 public class SingleReads {
 
-    private String hostName;
-    private int portNumber;
+    private final String hostName;
+    private final int portNumber;
     private long begin;
     private long end;
-    private int totalKeys;
-    public SingleReads(String host,int port,int numberOfKeys) {
+    private final long totalKeys;
+    public SingleReads(String host,int port,long numberOfKeys) {
         hostName = host;
         portNumber = port;
         totalKeys = numberOfKeys;
