@@ -177,6 +177,10 @@ public class CachedJedis extends Jedis {
         invalidationConnection = new Jedis(jedisSocketFactory, clientConfig);
     }
 
+    public Long getClientId() {
+        return clientId;
+    }
+
     public void setupCaching(JedisCacheConfig jedisCacheConfig) {
         if (jedisCacheConfig.isNoLoop() ||
             jedisCacheConfig.isOptInCaching() ||
@@ -329,7 +333,10 @@ public class CachedJedis extends Jedis {
         }
     }
 
-    // --------------------------------------------- Private Methods -------------------------------------------------
+    @VisibleForTesting
+    protected void invalidateCache(String key) {
+        cache.invalidate(key);
+    }
 
     @VisibleForTesting
     public long getCacheSize() {
@@ -339,6 +346,8 @@ public class CachedJedis extends Jedis {
             return 0;
         }
     }
+
+    // --------------------------------------------- Private Methods -------------------------------------------------
 
     private void putInCache(String key , Object value) {
         if(cachingEnabled) {
@@ -408,7 +417,7 @@ public class CachedJedis extends Jedis {
             @Override
             public void onMessage(String channel, List<Object> message) {
                 for (Object instance : message) {
-                    cache.invalidate(String.valueOf(instance));
+                    invalidateCache(String.valueOf(instance));
                 }
             }
 

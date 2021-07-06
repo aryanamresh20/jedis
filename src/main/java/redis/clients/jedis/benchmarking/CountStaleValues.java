@@ -3,6 +3,7 @@ package redis.clients.jedis.benchmarking;
 import redis.clients.jedis.JedisCacheConfig;
 import redis.clients.jedis.CachedJedis;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.Tuple;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,7 +29,7 @@ public class CountStaleValues {
     private long initialCachePopulate;
     private final List<Long> operationsTime = new CopyOnWriteArrayList<>();
     //To keep track of the last client setting the key
-    private final ConcurrentHashMap<String , String > checkStale = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String , String> checkStale = new ConcurrentHashMap<>();
     public CountStaleValues(String host , int port , long numberOfClients , long numberOfKeys , long readPercentage ,
                             long writePercentage , long numberOfOperations , long meanOperationTime , double sigmaOperationTime,
                             long expireAfterAccess , long expireAfterWrite , long messageLength , long initialCachePopulateIter) {
@@ -111,7 +112,7 @@ public class CountStaleValues {
 
     //Runnable for each thread
     Runnable runnable = () -> {
-        CachedJedis cachedJedis = new CachedJedis(hostName,portNumber);
+        CachedJedis cachedJedis = new BenchmarkingCachedJedis(hostName, portNumber);
         JedisCacheConfig jedisCacheConfig = JedisCacheConfig.Builder.newBuilder().maxCacheSize(totalKeys*2)
                                             .expireAfterWrite(expireAfterWriteMillis)
                                             .expireAfterAccess(expireAfterAccessMillis)
