@@ -1,21 +1,16 @@
 package redis.clients.jedis.benchmarking;
 
-import redis.clients.jedis.JedisCacheConfig;
-import redis.clients.jedis.CachedJedis;
 import redis.clients.jedis.Jedis;
-import redis.clients.jedis.Tuple;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Random;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-public class CountStaleValues {
-
+public class JedisLatencies {
     private String hostName;
     private int portNumber;
-    private volatile long staleCount = 0;
-    private volatile long cacheHit = 0;
-    private volatile int totalGet = 0;
     private final long reads ;
     private final long writes;
     private final long totalClients ;
@@ -23,16 +18,14 @@ public class CountStaleValues {
     private long totalOperations;
     private final double sigma ;
     private final long mean ;
-    private long expireAfterAccessMillis;
-    private long expireAfterWriteMillis;
     private final long messageSize;
-    private long initialCachePopulate;
+    private long interval;
+    private final long readFromGroup;
     private final List<Long> operationsTime = new CopyOnWriteArrayList<>();
-    //To keep track of the last client setting the key
-    private final ConcurrentHashMap<String , String> checkStale = new ConcurrentHashMap<>();
-    public CountStaleValues(String host , int port , long numberOfClients , long numberOfKeys , long readPercentage ,
-                            long writePercentage , long numberOfOperations , long meanOperationTime , double sigmaOperationTime,
-                            long expireAfterAccess , long expireAfterWrite , long messageLength , long initialCachePopulateIter) {
+    public JedisLatencies(String host , int port , long numberOfClients , long numberOfKeys , long readPercentage ,
+                                long writePercentage , long numberOfOperations , long meanOperationTime , double sigmaOperationTime,
+                                long expireAfterAccess , long expireAfterWrite , long messageLength , long initialCachePopulateIter ,
+                                long readFromGroupPercentage) {
         totalClients = numberOfClients;
         reads = readPercentage;
         writes = writePercentage;
@@ -42,12 +35,11 @@ public class CountStaleValues {
         totalOperations = numberOfOperations;
         mean = meanOperationTime;
         sigma = sigmaOperationTime;
-        expireAfterAccessMillis = expireAfterAccess;
-        expireAfterWriteMillis = expireAfterWrite;
         messageSize = messageLength;
-        initialCachePopulate = initialCachePopulateIter;
+        readFromGroup = readFromGroupPercentage;
+        interval = totalKeys/totalClients;
         populateDatabase();
-        cacheJedisThreads();
+        jedisThreads();
     }
     private void populateDatabase(){
         Jedis jedis = new Jedis(hostName,portNumber);
@@ -57,8 +49,8 @@ public class CountStaleValues {
         }
         jedis.close();
     }
-    //Starting multiple cacheJedis instances on multiple threads
-    private void cacheJedisThreads() {
+    //Starting multiple Jedis instances on multiple threads
+    private void jedisThreads() {
         List<Thread> threadList = new ArrayList<>();
         for(int i = 0 ; i < totalClients ; i ++){
             Thread thread =new Thread(runnable);
@@ -86,7 +78,7 @@ public class CountStaleValues {
     }
     private String randomString(){
         StringBuilder message = new StringBuilder();
-        for(int i = 0 ; i<messageSize ; i++){
+        for(int i = 0 ; i < messageSize ; i++){
             message.append(getRandom());
         }
         return String.valueOf(message);
@@ -97,6 +89,15 @@ public class CountStaleValues {
         Random rand = new Random();
         return rand.nextInt((int) totalKeys);
     }
+    private boolean getFromGroup() {
+        Random rand = new Random();
+        int random = rand.nextInt(100);
+        if(random<readFromGroup){
+            return true;
+        } else{
+            return false;
+        }
+    }
     private long waitTime(){
         Random rand = new Random();
         long value = (long) (rand.nextGaussian()*sigma+mean);
@@ -106,54 +107,46 @@ public class CountStaleValues {
         return value;
     }
 
-    private synchronized void incStaleCount(){ staleCount++; }
-    private synchronized void incTotalGet(){ totalGet++; }
-    private synchronized void incCacheHit() { cacheHit++; }
+
 
     //Runnable for each thread
     Runnable runnable = () -> {
-        CachedJedis cachedJedis = new BenchmarkingCachedJedis(hostName, portNumber);
-        JedisCacheConfig jedisCacheConfig = JedisCacheConfig.Builder.newBuilder().maxCacheSize(totalKeys*2)
-                                            .expireAfterWrite(expireAfterWriteMillis)
-                                            .expireAfterAccess(expireAfterAccessMillis)
-                                            .build();
-        cachedJedis.setupCaching(jedisCacheConfig);
-        for(int i =0 ; i < initialCachePopulate ; i++){
-            int randomKey = getRandom();
-            //Cache populating
-            cachedJedis.get(String.valueOf(randomKey));
-        }
-        String clientId = String.valueOf(cachedJedis.clientId());
+        Jedis jedis = new Jedis(hostName,portNumber);
+        Random rand = new Random();
+        int index = Integer.parseInt(Thread.currentThread().getName().substring(14));
+        long lowerBound = index*interval;
+        long upperBound = index*(interval)+interval;
+        long start;
+        long end;
+
 
         for(int i = 0 ; i < totalOperations ; i++) {
-            long start = System.nanoTime();
-            int randomGetSet = getBinaryRandom();
-            if (randomGetSet == 0) {
-                //SET functionality
-                int randomKey = getRandom() ;
-                cachedJedis.set(String.valueOf(randomKey) , "hello" + clientId);
-                //Updating the value of clientId writing on the key
 
-                checkStale.put(String.valueOf(randomKey) , clientId);
+            int randomGetSet = getBinaryRandom();
+            int randomKey;
+            if (randomGetSet == 0) {
+                if(getFromGroup()){
+                    randomKey = (int) (Math.random() * (upperBound - lowerBound) + lowerBound);
+                }else{
+                    randomKey = rand.nextInt((int) totalKeys);
+                }
+                String randomString = randomString();
+                start = System.nanoTime();
+                jedis.set(String.valueOf(randomKey) , randomString);
+                //Updating the value of clientId writing on the key
+                end = System.nanoTime();
             } else {
                 //GET functionality
-                incTotalGet();
-                int randomKey = getRandom();
-                //Check if the key was accessed from the cache
-                Boolean flag = cachedJedis.boolGet(String.valueOf(randomKey));
-                if (flag) {
-                    String value = checkStale.get(String.valueOf(randomKey));
-                    //key found in cache
-                    incCacheHit();
-                    if(value != null) {
-                        //Check if the value was stale
-                        if ( !(value.equals(clientId)) ) {
-                            incStaleCount();
-                        }
-                    }
+                if(getFromGroup()){
+                    randomKey = (int) (Math.random() * (upperBound - lowerBound) + lowerBound);
+                }else{
+                    randomKey = rand.nextInt((int) totalKeys);
                 }
+                start = System.nanoTime();
+                //Check if the key was accessed from the cache
+                String keyValue = jedis.get(String.valueOf(randomKey));
+                end = System.nanoTime();
             }
-            long end = System.nanoTime();
             operationsTime.add(end-start);
             long waitTime = waitTime();
             if(waitTime < 0){
@@ -165,26 +158,37 @@ public class CountStaleValues {
                 e.printStackTrace();
             }
         }
-        cachedJedis.close();
+        jedis.close();
     };
-    public long getStaleCount(){ return staleCount;}
-    public long getCacheHit() { return cacheHit;}
-    public long getCacheMiss() { return totalGet-cacheHit;}
     public void getLatencies(){
         Collections.sort(operationsTime);
+        long p10Time = operationsTime.get((int) (operationsTime.size()*0.1));
+        long p20Time = operationsTime.get((int) (operationsTime.size()*0.2));
+        long p30Time = operationsTime.get((int) (operationsTime.size()*0.3));
+        long p40Time = operationsTime.get((int) (operationsTime.size()*0.4));
         long p50Time = operationsTime.get((int) (operationsTime.size()*0.5));
         long p75Time = operationsTime.get((int) (operationsTime.size()*0.75));
         long p90Time = operationsTime.get((int) (operationsTime.size()*0.90));
         long p95Time = operationsTime.get((int) (operationsTime.size()*0.95));
         long p97Time = operationsTime.get((int) (operationsTime.size()*0.97));
         long p99Time = operationsTime.get((int) (operationsTime.size()*0.99));
+        long p995Time = operationsTime.get((int) (operationsTime.size()*0.995));
+        long p997Time = operationsTime.get((int) (operationsTime.size()*0.997));
+        long p999Time = operationsTime.get((int) (operationsTime.size()*0.999));
         System.out.println("Latencies in milliseconds");
+        System.out.println("P10 "+p10Time/1000000.0);
+        System.out.println("P25 "+p20Time/1000000.0);
+        System.out.println("P30 "+p30Time/1000000.0);
+        System.out.println("P45 "+p40Time/1000000.0);
         System.out.println("P50 "+p50Time/1000000.0);
         System.out.println("P75 "+p75Time/1000000.0);
         System.out.println("P90 "+p90Time/1000000.0);
         System.out.println("P95 "+p95Time/1000000.0);
         System.out.println("P97 "+p97Time/1000000.0);
         System.out.println("P99 "+p99Time/1000000.0);
+        System.out.println("P99.5 "+p995Time/1000000.0);
+        System.out.println("P99.7 "+p997Time/1000000.0);
+        System.out.println("P99.9 "+p999Time/1000000.0);
+        System.out.println("Average latency "+operationsTime.stream().mapToDouble(d->d).average());
     }
-
 }

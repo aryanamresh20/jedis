@@ -177,10 +177,6 @@ public class CachedJedis extends Jedis {
         invalidationConnection = new Jedis(jedisSocketFactory, clientConfig);
     }
 
-    public Long getClientId() {
-        return clientId;
-    }
-
     public void setupCaching(JedisCacheConfig jedisCacheConfig) {
         if (jedisCacheConfig.isNoLoop() ||
             jedisCacheConfig.isOptInCaching() ||

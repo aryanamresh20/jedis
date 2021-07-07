@@ -28,8 +28,8 @@ public class BenchmarkingMain {
         long expireAfterWrite = Long.parseLong(props.getProperty("expireAfterWriteMillis"));
         long initialCachePopulate = Long.parseLong(props.getProperty("initialCachePopulationIters"));
         long messageSize = Long.parseLong(props.getProperty("messageSize"));
+        long readFromGroup = Long.parseLong(props.getProperty("readFromGroup"));
         double sigmaOperationTime = Double.parseDouble(props.getProperty("sigmaOperationTime"));
-        boolean flag = true;
 
         //Comparing the time elapsed for reads where all reads comprise of cache misses
         SingleReads singleReads = new SingleReads(hostName,portNumber,numberOfKeys);
@@ -52,14 +52,15 @@ public class BenchmarkingMain {
         System.out.println("hget reads time taken by CachedJedis instance "+ readsHgetAll.CacheJedisTest());
 
         //Evaluating various parameters on multi CachedJedis clients Stale values , Cache Misses e.t.c on various parameters
-        CountStaleValues countStaleValues = new CountStaleValues(hostName,portNumber,numberOfClients,numberOfKeys,
+        CachedJedisLatencies cachedJedisLatencies = new CachedJedisLatencies(hostName,portNumber,numberOfClients,numberOfKeys,
                                                 readPercentage,writePercentage,numberOfOperations,meanOperationTime,
-                                                sigmaOperationTime,expireAfterAccess,expireAfterWrite,messageSize,initialCachePopulate);
+                                                sigmaOperationTime,expireAfterAccess,expireAfterWrite,messageSize,initialCachePopulate,
+                                                readFromGroup);
 
-        System.out.println("Stale values "+countStaleValues.getStaleCount());
-        System.out.println("Cache Hits "+countStaleValues.getCacheHit());
-        System.out.println("Cache Misses "+countStaleValues.getCacheMiss());
-        countStaleValues.getLatencies();
+        System.out.println("Stale values "+ cachedJedisLatencies.getStaleCount());
+        System.out.println("Cache Hits "+ cachedJedisLatencies.getCacheHit());
+        System.out.println("Cache Misses "+ cachedJedisLatencies.getCacheMiss());
+        cachedJedisLatencies.getLatencies();
 
     }
 }
