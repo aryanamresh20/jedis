@@ -6,14 +6,14 @@ import redis.clients.jedis.JedisCacheConfig;
 
 import java.util.Calendar;
 
-public class SingleReads {
+public class ServerReadsGet {
 
     private final String hostName;
     private final int portNumber;
     private long begin;
     private long end;
     private final long totalKeys;
-    public SingleReads(String host,int port,long numberOfKeys) {
+    public ServerReadsGet(String host, int port, long numberOfKeys) {
         hostName = host;
         portNumber = port;
         totalKeys = numberOfKeys;

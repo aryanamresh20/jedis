@@ -186,7 +186,7 @@ public class CachedJedis extends Jedis {
         cachingEnabled = true;
         initClientTracking(jedisCacheConfig);
         cache = CacheBuilder.newBuilder()
-                .maximumSize(jedisCacheConfig.getMaxCacheSize())
+                .maximumSize(jedisCacheConfig.getMaxCacheSize()).concurrencyLevel(64)
                 .expireAfterAccess(jedisCacheConfig.getExpireAfterAccessMillis(), TimeUnit.MILLISECONDS)
                 .expireAfterWrite(jedisCacheConfig.getExpireAfterWriteMillis(), TimeUnit.MILLISECONDS)
                 .build();
@@ -195,10 +195,10 @@ public class CachedJedis extends Jedis {
 
     @Override
     public String get(String key) {
-        checkIsInMultiOrPipeline();
         if(cachingEnabled) {
             Object cachedValue = getFromCache(key);
             if (cachedValue != null) {
+                checkIsInMultiOrPipeline();
                 //Found in cache
                 if (cachedValue == DUMMY) {
                     return null;
@@ -310,24 +310,7 @@ public class CachedJedis extends Jedis {
         super.close();
     }
 
-    @VisibleForTesting
-    public Boolean boolGet(String key) {
-        if(cachingEnabled) {
-            if (getFromCache(key) != null) {
-                return true;
-            } else {
-                String value = super.get(key);
-                if (value != null) {
-                    putInCache(key , value);
-                } else {
-                    putInCache(key , DUMMY);
-                }
-                return false;
-            }
-        } else {
-            return false;
-        }
-    }
+
 
     @VisibleForTesting
     protected void invalidateCache(String key) {
@@ -342,22 +325,26 @@ public class CachedJedis extends Jedis {
             return 0;
         }
     }
+    @VisibleForTesting
+    public boolean getIfCachingEnabled(){ return cachingEnabled; }
 
-    // --------------------------------------------- Private Methods -------------------------------------------------
+    // --------------------------------------------- Protected Methods -------------------------------------------------
 
-    private void putInCache(String key , Object value) {
+    protected void putInCache(String key, Object value) {
         if(cachingEnabled) {
-            cache.put(key,value);
+            cache.asMap().put(key,value);
         }
     }
 
-    private Object getFromCache(String key){
+    protected Object getFromCache(String key){
         if(!cachingEnabled) {
             return null;
         } else {
             return cache.getIfPresent(key);
         }
     }
+
+    // --------------------------------------------- Private Methods -------------------------------------------------
 
     private void initClientTracking(JedisCacheConfig jedisCacheConfig) {
         if (invalidationConnection == null) {

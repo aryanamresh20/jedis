@@ -6,14 +6,12 @@ import redis.clients.jedis.Jedis;
 
 import java.util.Calendar;
 
-public class CacheReads {
+public class CacheReadsGet {
 
     private final String hostName;
     private final int portNumber;
-    private long begin;
-    private long end;
     private final long totalKeys;
-    public CacheReads(String host,int port,long numberOfKeys) {
+    public CacheReadsGet(String host, int port, long numberOfKeys) {
         hostName = host;
         portNumber = port;
         totalKeys = numberOfKeys;
@@ -29,14 +27,14 @@ public class CacheReads {
 
     public long JedisTest() {
         Jedis jedisInstance = new Jedis(hostName,portNumber);
-        begin = Calendar.getInstance().getTimeInMillis();
+        long begin = Calendar.getInstance().getTimeInMillis();
         for(int i = 0 ; i < totalKeys ; i++){
             jedisInstance.get(String.valueOf(i)); // Initial Reads , reads directly from the server
             for(int j = i ; j >= 0 ; j--){
                 jedisInstance.get(String.valueOf(j)); // No Caching available reads from the server creates delays
             }
         }
-        end = Calendar.getInstance().getTimeInMillis();
+        long end = Calendar.getInstance().getTimeInMillis();
         jedisInstance.close();
         return (end-begin);
     }
@@ -49,14 +47,14 @@ public class CacheReads {
                                             .expireAfterWrite(1000)
                                             .build();
         cachedJedisInstance.setupCaching(jedisCacheConfig);
-        begin = Calendar.getInstance().getTimeInMillis();
+        long begin = Calendar.getInstance().getTimeInMillis();
         for(int i = 0 ; i < totalKeys  ; i++){
             cachedJedisInstance.get(String.valueOf(i)); // Initial Reads , reads directly from the server
             for(int j = i ; j >= 0 ; j--){
                 cachedJedisInstance.get(String.valueOf(j)); // Cached Reads , reads from the local cache
             }
         }
-        end = Calendar.getInstance().getTimeInMillis();
+        long end = Calendar.getInstance().getTimeInMillis();
         cachedJedisInstance.close();
         return (end-begin);
     }
