@@ -6,6 +6,7 @@ import redis.clients.jedis.Jedis;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import static redis.clients.jedis.benchmarking.BenchmarkingCachedJedis.KEY_PREFIX;
 
@@ -28,13 +29,14 @@ public class CacheReadsMget {
     public long JedisTest() {
         try (Jedis jedisInstance = new Jedis(hostName, portNumber)) {
             long finalDuration = 0;
+            Random rand = new Random();
             for (int i = 0; i < totalKeys; i++) {
                 List<String> mgetInstance = new ArrayList<>();
                 // Initial Reads ,these keys reads directly from the server
                 mgetInstance.add(KEY_PREFIX + i);
-                for (int j = i; j >= 0; j--) {
+                for (int j = 0; j < rand.nextInt((int) totalKeys) ; j++) {
                     // No Caching available these keys also reads from the server creates delays
-                    mgetInstance.add(KEY_PREFIX + j);
+                    mgetInstance.add(KEY_PREFIX + rand.nextInt((int) totalKeys));
                 }
                 String[] mgetInstanceArray = new String[mgetInstance.size()];
                 mgetInstanceArray = mgetInstance.toArray(mgetInstanceArray);
@@ -56,14 +58,15 @@ public class CacheReadsMget {
                 .expireAfterWrite(expireTimeWrite)
                 .build();
             cachedJedisInstance.setupCaching(jedisCacheConfig);
+            Random rand = new Random();
             long finalDuration = 0;
             for (int i = 0; i < totalKeys; i++) {
                 List<String> mgetInstance = new ArrayList<>();
                 // Initial Reads ,these keys reads directly from the server
                 mgetInstance.add(KEY_PREFIX + i);
-                for (int j = i; j >= 0; j--) {
+                for (int j =0 ; j < rand.nextInt((int) totalKeys); j++) {
                     //Caching available these keys reads from the local Cache
-                    mgetInstance.add(KEY_PREFIX + j);
+                    mgetInstance.add(KEY_PREFIX + rand.nextInt((int) totalKeys));
                 }
                 String[] mgetInstanceArray = new String[mgetInstance.size()];
                 mgetInstanceArray = mgetInstance.toArray(mgetInstanceArray);

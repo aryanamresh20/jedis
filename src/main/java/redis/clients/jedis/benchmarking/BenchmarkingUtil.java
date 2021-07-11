@@ -31,21 +31,21 @@ public class BenchmarkingUtil {
         }
     }
 
-    public static void populateHashes(String hostName, int portNumber, long totalKeys) {
+    public static void populateHashes(String hostName, int portNumber, long totalKeys, long messageSize) {
         try (Jedis jedis = new Jedis(hostName, portNumber)) {
             for (int i = 0; i < totalKeys; i++) {
                 //Populating the database with multiple number of keys
                 Map<String , String> map = new HashMap<>();
-                map.put("hello0", "world0"+i);
-                map.put("hello1", "world1"+i);
-                map.put("hello2", "world2"+i);
-                map.put("hello3", "world3"+i);
-                map.put("hello4", "world4"+i);
-                map.put("hello5", "world5"+i);
-                map.put("hello6", "world6"+i);
-                map.put("hello7", "world7"+i);
-                map.put("hello8", "world8"+i);
-                map.put("hello9", "world9"+i);
+                map.put("hello0", randomString(messageSize));
+                map.put("hello1", randomString(messageSize));
+                map.put("hello2", randomString(messageSize));
+                map.put("hello3", randomString(messageSize));
+                map.put("hello4", randomString(messageSize));
+                map.put("hello5", randomString(messageSize));
+                map.put("hello6", randomString(messageSize));
+                map.put("hello7", randomString(messageSize));
+                map.put("hello8", randomString(messageSize));
+                map.put("hello9", randomString(messageSize));
                 //Populating the database with multiple hash
                 jedis.hset(HASH_KEY_PREFIX + i, map);
                 jedis.expire(HASH_KEY_PREFIX + i, EXPIRY_SECONDS);

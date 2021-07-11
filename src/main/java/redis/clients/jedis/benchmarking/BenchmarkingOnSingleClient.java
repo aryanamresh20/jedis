@@ -33,7 +33,7 @@ public class BenchmarkingOnSingleClient {
 
             try {
                 BenchmarkingUtil.populateKeys(hostName, portNumber, numberOfKeys, messageSize);
-                BenchmarkingUtil.populateHashes(hostName, portNumber, numberOfKeys);
+                BenchmarkingUtil.populateHashes(hostName, portNumber, numberOfKeys, messageSize);
 
                 //Comparing the time elapsed for reads where all reads comprise of cache misses
                 ServerReadsGet serverReadsGet = new ServerReadsGet(hostName, portNumber, numberOfKeys,expireAfterAccess,expireAfterWrite);

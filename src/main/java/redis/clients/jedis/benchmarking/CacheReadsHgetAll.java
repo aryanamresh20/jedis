@@ -24,14 +24,14 @@ public class CacheReadsHgetAll {
 
     public long JedisTest() {
         try (Jedis jedisInstance = new Jedis(hostName, portNumber)) {
-            long begin = System.currentTimeMillis();
-            for (int i = 0; i < totalKeys; i++) {
+            for (int i = 0; i < totalKeys; i++){
                 // Initial Reads ,these keys reads directly from the server
                 jedisInstance.hgetAll(HASH_KEY_PREFIX + i);
-                for (int j = i; j >= 0; j--) {
-                    // No Caching available these keys also reads from the server creates delays
-                    jedisInstance.hgetAll(HASH_KEY_PREFIX + j);
-                }
+            }
+            long begin = System.currentTimeMillis();
+            for (int i = 0; i < totalKeys; i++) {
+                // No Caching available these keys also reads from the server creates delays
+                jedisInstance.hgetAll(HASH_KEY_PREFIX + i);
             }
             long end = System.currentTimeMillis();
             jedisInstance.quit();
@@ -47,14 +47,14 @@ public class CacheReadsHgetAll {
                 .expireAfterWrite(expireTimeWrite)
                 .build();
             cachedJedisInstance.setupCaching(jedisCacheConfig);
-            long begin = System.currentTimeMillis();
-            for (int i = 0; i < totalKeys; i++) {
+            for (int i = 0; i < totalKeys; i++){
                 // Initial Reads ,these keys reads directly from the server
                 cachedJedisInstance.hgetAll(HASH_KEY_PREFIX + i);
-                for (int j = i; j >= 0; j--) {
-                    // No Caching available these keys also reads from the server creates delays
-                    cachedJedisInstance.hgetAll(HASH_KEY_PREFIX + j);
-                }
+            }
+            long begin = System.currentTimeMillis();
+            for (int i = 0; i < totalKeys; i++) {
+                // Cache reads , reads from the cache
+                cachedJedisInstance.hgetAll(HASH_KEY_PREFIX + i);
             }
             long end = System.currentTimeMillis();
             cachedJedisInstance.quit();
