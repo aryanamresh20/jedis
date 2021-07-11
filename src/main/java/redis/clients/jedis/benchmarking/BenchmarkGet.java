@@ -6,28 +6,27 @@ import redis.clients.jedis.Jedis;
 
 import static redis.clients.jedis.benchmarking.BenchmarkingCachedJedis.KEY_PREFIX;
 
-public class CacheReadsGet {
+public class BenchmarkGet {
 
     private final String hostName;
     private final int portNumber;
     private final long totalKeys;
     private final long expireTimeAccess;
     private final long expireTimeWrite;
+    private final long warmCacheIterations;
 
-    public CacheReadsGet(String host, int port, long numberOfKeys, long expireAfterAccess, long expireAfterWrite) {
-        hostName = host;
-        portNumber = port;
-        totalKeys = numberOfKeys;
-        expireTimeAccess = expireAfterAccess;
-        expireTimeWrite = expireAfterWrite;
+    public BenchmarkGet(String host, int port, long numberOfKeys, long expireAfterAccess,
+                        long expireAfterWrite, long warmCacheIterations) {
+        this.hostName = host;
+        this.portNumber = port;
+        this.totalKeys = numberOfKeys;
+        this.expireTimeAccess = expireAfterAccess;
+        this.expireTimeWrite = expireAfterWrite;
+        this.warmCacheIterations = warmCacheIterations;
     }
 
-    public long JedisTest() {
+    public long getJedisRunningTime() {
         try (Jedis jedisInstance = new Jedis(hostName, portNumber)) {
-            for (int i = 0; i < totalKeys; i++){
-                // Initial Reads , reads directly from the server
-                jedisInstance.get(KEY_PREFIX + i);
-            }
             long begin = System.currentTimeMillis();
             for (int i = 0; i < totalKeys; i++) {
                 // No Caching available reads from the server creates delays
@@ -39,7 +38,7 @@ public class CacheReadsGet {
         }
     }
 
-    public long CacheJedisTest(){
+    public long getCachedJedisRunningTime(boolean warmCache) {
         try (CachedJedis cachedJedisInstance = new CachedJedis(hostName, portNumber)) {
             JedisCacheConfig jedisCacheConfig = JedisCacheConfig.Builder.newBuilder()
                 .maxCacheSize(totalKeys * 2)
@@ -47,9 +46,8 @@ public class CacheReadsGet {
                 .expireAfterWrite(expireTimeWrite)
                 .build();
             cachedJedisInstance.setupCaching(jedisCacheConfig);
-            for (int i = 0; i < totalKeys; i++){
-                // Initial Reads , reads directly from the server
-                cachedJedisInstance.get(KEY_PREFIX + i);
+            if (warmCache) {
+                BenchmarkingUtil.warmCache(cachedJedisInstance, warmCacheIterations, totalKeys, false);
             }
             long begin = System.currentTimeMillis();
             for (int i = 0; i < totalKeys; i++) {

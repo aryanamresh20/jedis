@@ -18,10 +18,10 @@ public class BenchmarkingCachedJedis extends CachedJedis {
     public static final String HASH_KEY_PREFIX = "benchmarking:test:hash:";
 
     private static final Object DUMMY = new Object();
-    public final HashMap<String , Long> staleTime = new HashMap<>();
-    public final List<Long> staleTimeLatencies = new ArrayList<>();
-    public final List<Long> serverGetLatencies = new ArrayList<>();
-    public List<Long> putInCacheLatencies = new ArrayList<>();
+    private final HashMap<String , Long> staleTime = new HashMap<>();
+    private final List<Long> staleTimeLatencies = new ArrayList<>();
+    private final List<Long> serverGetLatencies = new ArrayList<>();
+    private List<Long> putInCacheLatencies = new ArrayList<>();
 
     public BenchmarkingCachedJedis(String host, int port) {
         super(host, port);

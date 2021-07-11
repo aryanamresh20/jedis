@@ -1,12 +1,18 @@
 package redis.clients.jedis.benchmarking;
 
+import redis.clients.jedis.CachedJedis;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
 
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 
 import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
 import static redis.clients.jedis.benchmarking.BenchmarkingCachedJedis.HASH_KEY_PREFIX;
@@ -20,6 +26,28 @@ import static redis.clients.jedis.benchmarking.BenchmarkingCachedJedis.KEY_PREFI
 public class BenchmarkingUtil {
 
     private static final long EXPIRY_SECONDS = TimeUnit.HOURS.toSeconds(5);
+
+    public static Properties loadConfigFile(String[] args) throws Exception {
+        InputStream inputStream = null;
+        try {
+            //config file for setting various properties
+            if (args.length == 0) {
+                String filePath = "default-benchmarking-config.properties";
+                ClassLoader classLoader = BenchmarkingOnSingleClient.class.getClassLoader();
+                inputStream = classLoader.getResourceAsStream(filePath);
+            } else {
+                inputStream = new FileInputStream(args[0]);
+            }
+
+            Properties props = new Properties();
+            props.load(inputStream);
+            return props;
+        } finally {
+            if (inputStream != null) {
+                inputStream.close();
+            }
+        }
+    }
 
     public static void populateKeys(String hostName, int portNumber, long totalKeys, long messageSize) {
         try (Jedis jedis = new Jedis(hostName, portNumber)) {
@@ -36,30 +64,13 @@ public class BenchmarkingUtil {
             for (int i = 0; i < totalKeys; i++) {
                 //Populating the database with multiple number of keys
                 Map<String , String> map = new HashMap<>();
-                map.put("hello0", randomString(messageSize));
-                map.put("hello1", randomString(messageSize));
-                map.put("hello2", randomString(messageSize));
-                map.put("hello3", randomString(messageSize));
-                map.put("hello4", randomString(messageSize));
-                map.put("hello5", randomString(messageSize));
-                map.put("hello6", randomString(messageSize));
-                map.put("hello7", randomString(messageSize));
-                map.put("hello8", randomString(messageSize));
-                map.put("hello9", randomString(messageSize));
+                IntStream.range(0, 10).forEach(l -> map.put("hello" + l, randomString(messageSize)));
                 //Populating the database with multiple hash
                 jedis.hset(HASH_KEY_PREFIX + i, map);
                 jedis.expire(HASH_KEY_PREFIX + i, EXPIRY_SECONDS);
             }
             jedis.quit();
         }
-    }
-
-    private static String randomString(long messageSize){
-        StringBuilder message = new StringBuilder();
-        for(int i = 0 ; i < messageSize ; i++){
-            message.append(Math.random());
-        }
-        return String.valueOf(message);
     }
 
     public static void cleanDatabase(String hostName, int portNumber) {
@@ -73,5 +84,25 @@ public class BenchmarkingUtil {
             } while (!cursor.equals(SCAN_POINTER_START));
             jedis.quit();
         }
+    }
+
+    public static void warmCache(CachedJedis cachedJedis, long warmCacheIterations, long totalKeys, boolean hashKeys) {
+        for (int i = 0; i < warmCacheIterations; i++) {
+            long key = ThreadLocalRandom.current().nextLong(totalKeys);
+            // Initial Reads , reads directly from the server
+            if (!hashKeys) {
+                cachedJedis.get(KEY_PREFIX + key);
+            } else {
+                cachedJedis.hgetAll(HASH_KEY_PREFIX + key);
+            }
+        }
+    }
+
+    public static String randomString(long messageSize){
+        StringBuilder message = new StringBuilder();
+        for(int i = 0 ; i < messageSize ; i++){
+            message.append(ThreadLocalRandom.current().nextInt(0, 10));
+        }
+        return String.valueOf(message);
     }
 }
