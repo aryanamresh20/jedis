@@ -159,6 +159,7 @@ public abstract class JedisPubSub {
         Object channelMessage = reply.get(2);
         if(channelMessage instanceof List) {
           final Object encodedObject = SafeEncoder.encodeObject(channelMessage);
+          // noinspection unchecked
           List<Object> objectList = (List <Object>) encodedObject;
           onMessage(strchannel, objectList);
         } else {

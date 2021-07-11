@@ -35,7 +35,7 @@ public class CachedJedis extends Jedis {
     private final Jedis invalidationConnection;
     private Cache<String , Object> cache;
     private volatile boolean cachingEnabled;
-    private Long clientId;
+    private volatile long clientId;
 
     public CachedJedis() {
         super();
@@ -186,19 +186,20 @@ public class CachedJedis extends Jedis {
         cachingEnabled = true;
         initClientTracking(jedisCacheConfig);
         cache = CacheBuilder.newBuilder()
-                .maximumSize(jedisCacheConfig.getMaxCacheSize()).concurrencyLevel(64)
+                .maximumSize(jedisCacheConfig.getMaxCacheSize())
                 .expireAfterAccess(jedisCacheConfig.getExpireAfterAccessMillis(), TimeUnit.MILLISECONDS)
                 .expireAfterWrite(jedisCacheConfig.getExpireAfterWriteMillis(), TimeUnit.MILLISECONDS)
+                .concurrencyLevel(jedisCacheConfig.getConcurrencyLevel())
                 .build();
         setupInvalidationPubSub();
     }
 
     @Override
     public String get(String key) {
-        if(cachingEnabled) {
+        checkIsInMultiOrPipeline();
+        if (cachingEnabled) {
             Object cachedValue = getFromCache(key);
             if (cachedValue != null) {
-                checkIsInMultiOrPipeline();
                 //Found in cache
                 if (cachedValue == DUMMY) {
                     return null;
@@ -222,7 +223,7 @@ public class CachedJedis extends Jedis {
     @Override
     public List<String> mget(String... keys) {
         checkIsInMultiOrPipeline();
-        if(cachingEnabled) {
+        if (cachingEnabled) {
             List<String> finalValue = new ArrayList<>();
             List<String> keysNotInCache = new ArrayList<>();
             for (String key : keys) {
@@ -252,7 +253,7 @@ public class CachedJedis extends Jedis {
                         if (valueAtindex == null) {
                             putInCache(keys[index], DUMMY);
                         } else {
-                            putInCache(keys[index], valuesFromServer.get(indexValuesFromServer));
+                            putInCache(keys[index], valueAtindex);
                         }
                         indexValuesFromServer++;
                     }
@@ -272,7 +273,7 @@ public class CachedJedis extends Jedis {
     @Override
     public Map<String, String> hgetAll(String key) {
         checkIsInMultiOrPipeline();
-        if(cachingEnabled) {
+        if (cachingEnabled) {
             Object cachedValue = getFromCache(key);
             if (cachedValue != null) {
                 if (cachedValue == DUMMY) {
@@ -296,7 +297,7 @@ public class CachedJedis extends Jedis {
 
     @Override
     public String quit() {
-        if(cachingEnabled) {
+        if (cachingEnabled) {
             pushPoisonPill();
         }
         return super.quit();
@@ -304,13 +305,11 @@ public class CachedJedis extends Jedis {
 
     @Override
     public void close() {
-        if(cachingEnabled) {
+        if (cachingEnabled) {
             pushPoisonPill();
         }
         super.close();
     }
-
-
 
     @VisibleForTesting
     protected void invalidateCache(String key) {
@@ -325,19 +324,22 @@ public class CachedJedis extends Jedis {
             return 0;
         }
     }
+
     @VisibleForTesting
-    public boolean getIfCachingEnabled(){ return cachingEnabled; }
+    public boolean isCachingEnabled() {
+        return cachingEnabled;
+    }
 
     // --------------------------------------------- Protected Methods -------------------------------------------------
 
     protected void putInCache(String key, Object value) {
-        if(cachingEnabled) {
-            cache.asMap().put(key,value);
+        if (cachingEnabled) {
+            cache.put(key, value);
         }
     }
 
     protected Object getFromCache(String key){
-        if(!cachingEnabled) {
+        if (!cachingEnabled) {
             return null;
         } else {
             return cache.getIfPresent(key);
@@ -403,7 +405,6 @@ public class CachedJedis extends Jedis {
                     invalidateCache(String.valueOf(instance));
                 }
             }
-
         };
     }
 

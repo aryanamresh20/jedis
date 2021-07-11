@@ -4,13 +4,15 @@ import java.util.concurrent.TimeUnit;
 
 public class JedisCacheConfig {
 
-    private static final long MAX_CACHE_SIZE = 1000L;
+    private static final long MAX_CACHE_SIZE = 10000L;
     private static final long EXPIRE_AFTER_ACCESS_MILLIS = TimeUnit.MINUTES.toMillis(5);
     private static final long EXPIRE_AFTER_WRITE_MILLIS = TimeUnit.MINUTES.toMillis(5);
+    private static final int CONCURRENCY_LEVEL = 16;
 
     private final long maxCacheSize;
     private final long expireAfterAccessMillis;
     private final long expireAfterWriteMillis;
+    private final int concurrencyLevel;
     private final TrackingMode trackingMode;
     private final boolean optInCaching;
     private final boolean noLoop;
@@ -19,6 +21,7 @@ public class JedisCacheConfig {
         this.maxCacheSize = builder.maxCacheSize;
         this.expireAfterAccessMillis = builder.expireAfterAccessMillis;
         this.expireAfterWriteMillis = builder.expireAfterWriteMillis;
+        this.concurrencyLevel = builder.concurrencyLevel;
         this.trackingMode = builder.trackingMode;
         this.optInCaching = builder.optInCaching;
         this.noLoop = builder.noLoop;
@@ -34,6 +37,10 @@ public class JedisCacheConfig {
 
     public long getExpireAfterWriteMillis() {
         return expireAfterWriteMillis;
+    }
+
+    public int getConcurrencyLevel() {
+        return concurrencyLevel;
     }
 
     public TrackingMode getTrackingMode() {
@@ -52,6 +59,7 @@ public class JedisCacheConfig {
         private long maxCacheSize = MAX_CACHE_SIZE;
         private long expireAfterAccessMillis = EXPIRE_AFTER_ACCESS_MILLIS;
         private long expireAfterWriteMillis = EXPIRE_AFTER_WRITE_MILLIS;
+        private int concurrencyLevel = CONCURRENCY_LEVEL;
         private TrackingMode trackingMode = TrackingMode.DEFAULT;
         private boolean optInCaching;
         private boolean noLoop;
@@ -76,6 +84,11 @@ public class JedisCacheConfig {
 
         public Builder expireAfterWrite(long expireAfterWriteMillis) {
             this.expireAfterWriteMillis = expireAfterWriteMillis;
+            return this;
+        }
+
+        public Builder concurrencyLevel(int concurrencyLevel) {
+            this.concurrencyLevel = concurrencyLevel;
             return this;
         }
 
