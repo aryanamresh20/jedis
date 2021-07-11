@@ -21,11 +21,11 @@ public class BenchmarkingUtil {
 
     private static final long EXPIRY_SECONDS = TimeUnit.HOURS.toSeconds(5);
 
-    public static void populateKeys(String hostName, int portNumber, long totalKeys) {
+    public static void populateKeys(String hostName, int portNumber, long totalKeys, long messageSize) {
         try (Jedis jedis = new Jedis(hostName, portNumber)) {
             for (int i = 0; i < totalKeys; i++) {
                 //Populating the database with multiple number of keys
-                jedis.setex(KEY_PREFIX + i, EXPIRY_SECONDS, "hello" + i);
+                jedis.setex(KEY_PREFIX + i, EXPIRY_SECONDS, randomString(messageSize));
             }
             jedis.quit();
         }
@@ -52,6 +52,14 @@ public class BenchmarkingUtil {
             }
             jedis.quit();
         }
+    }
+
+    private static String randomString(long messageSize){
+        StringBuilder message = new StringBuilder();
+        for(int i = 0 ; i < messageSize ; i++){
+            message.append(Math.random());
+        }
+        return String.valueOf(message);
     }
 
     public static void cleanDatabase(String hostName, int portNumber) {

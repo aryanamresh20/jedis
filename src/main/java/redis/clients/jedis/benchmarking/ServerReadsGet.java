@@ -11,11 +11,15 @@ public class ServerReadsGet {
     private final String hostName;
     private final int portNumber;
     private final long totalKeys;
+    private final long expireTimeAccess;
+    private final long expireTimeWrite;
 
-    public ServerReadsGet(String host, int port, long numberOfKeys) {
+    public ServerReadsGet(String host, int port, long numberOfKeys, long expireAfterAccess, long expireAfterWrite) {
         hostName = host;
         portNumber = port;
         totalKeys = numberOfKeys;
+        expireTimeAccess = expireAfterAccess;
+        expireTimeWrite = expireAfterWrite;
     }
 
     public long JedisTest() {
@@ -33,7 +37,8 @@ public class ServerReadsGet {
 
     public long CacheJedisTest(){
         try (CachedJedis cachedJedisInstance = new CachedJedis(hostName, portNumber)) {
-            cachedJedisInstance.setupCaching(JedisCacheConfig.Builder.newBuilder().build());
+            cachedJedisInstance.setupCaching(JedisCacheConfig.Builder.newBuilder().expireAfterAccess(expireTimeAccess).
+                                             expireAfterWrite(expireTimeWrite).build());
             long begin = System.currentTimeMillis();
             for (int i = 0; i < totalKeys; i++) {
                 //Single reads , reads directly from the server , keys not cached

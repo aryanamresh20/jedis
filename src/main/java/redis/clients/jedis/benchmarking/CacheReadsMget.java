@@ -14,16 +14,20 @@ public class CacheReadsMget {
     private final String hostName;
     private final int portNumber;
     private final long totalKeys;
+    private final long expireTimeAccess;
+    private final long expireTimeWrite;
 
-    public CacheReadsMget(String host, int port, long numberOfKeys) {
+    public CacheReadsMget(String host, int port, long numberOfKeys, long expireAfterAccess, long expireAfterWrite) {
         hostName = host;
         portNumber = port;
         totalKeys = numberOfKeys;
+        expireTimeAccess = expireAfterAccess;
+        expireTimeWrite = expireAfterWrite;
     }
 
     public long JedisTest() {
         try (Jedis jedisInstance = new Jedis(hostName, portNumber)) {
-            long begin = System.currentTimeMillis();
+            long finalDuration = 0;
             for (int i = 0; i < totalKeys; i++) {
                 List<String> mgetInstance = new ArrayList<>();
                 // Initial Reads ,these keys reads directly from the server
@@ -34,11 +38,13 @@ public class CacheReadsMget {
                 }
                 String[] mgetInstanceArray = new String[mgetInstance.size()];
                 mgetInstanceArray = mgetInstance.toArray(mgetInstanceArray);
+                long begin = System.currentTimeMillis();
                 jedisInstance.mget(mgetInstanceArray);
+                long end = System.currentTimeMillis();
+                finalDuration += (end-begin);
             }
-            long end = System.currentTimeMillis();
             jedisInstance.quit();
-            return (end - begin);
+            return finalDuration;
         }
     }
 
@@ -46,11 +52,11 @@ public class CacheReadsMget {
         try (CachedJedis cachedJedisInstance = new CachedJedis(hostName, portNumber)) {
             JedisCacheConfig jedisCacheConfig = JedisCacheConfig.Builder.newBuilder()
                 .maxCacheSize(totalKeys * 2)
-                .expireAfterAccess(1000)
-                .expireAfterWrite(1000)
+                .expireAfterAccess(expireTimeAccess)
+                .expireAfterWrite(expireTimeWrite)
                 .build();
             cachedJedisInstance.setupCaching(jedisCacheConfig);
-            long begin = System.currentTimeMillis();
+            long finalDuration = 0;
             for (int i = 0; i < totalKeys; i++) {
                 List<String> mgetInstance = new ArrayList<>();
                 // Initial Reads ,these keys reads directly from the server
@@ -61,11 +67,13 @@ public class CacheReadsMget {
                 }
                 String[] mgetInstanceArray = new String[mgetInstance.size()];
                 mgetInstanceArray = mgetInstance.toArray(mgetInstanceArray);
+                long begin = System.currentTimeMillis();
                 cachedJedisInstance.mget(mgetInstanceArray);
+                long end = System.currentTimeMillis();
+                finalDuration += (end-begin);
             }
-            long end = System.currentTimeMillis();
             cachedJedisInstance.quit();
-            return (end - begin);
+            return finalDuration;
         }
     }
 }

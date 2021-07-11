@@ -11,11 +11,15 @@ public class CacheReadsGet {
     private final String hostName;
     private final int portNumber;
     private final long totalKeys;
+    private final long expireTimeAccess;
+    private final long expireTimeWrite;
 
-    public CacheReadsGet(String host, int port, long numberOfKeys) {
+    public CacheReadsGet(String host, int port, long numberOfKeys, long expireAfterAccess, long expireAfterWrite) {
         hostName = host;
         portNumber = port;
         totalKeys = numberOfKeys;
+        expireTimeAccess = expireAfterAccess;
+        expireTimeWrite = expireAfterWrite;
     }
 
     public long JedisTest() {
@@ -39,8 +43,8 @@ public class CacheReadsGet {
         try (CachedJedis cachedJedisInstance = new CachedJedis(hostName, portNumber)) {
             JedisCacheConfig jedisCacheConfig = JedisCacheConfig.Builder.newBuilder()
                 .maxCacheSize(totalKeys * 2)
-                .expireAfterAccess(1000)
-                .expireAfterWrite(1000)
+                .expireAfterAccess(expireTimeAccess)
+                .expireAfterWrite(expireTimeWrite)
                 .build();
             cachedJedisInstance.setupCaching(jedisCacheConfig);
             long begin = System.currentTimeMillis();
