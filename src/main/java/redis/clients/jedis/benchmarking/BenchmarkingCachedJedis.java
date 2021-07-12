@@ -18,23 +18,13 @@ public class BenchmarkingCachedJedis extends CachedJedis {
     public static final String HASH_KEY_PREFIX = "benchmarking:test:hash:";
 
     private static final Object DUMMY = new Object();
-    public final HashMap<String , Long> staleTime = new HashMap<>();
-    private final List<Long> staleTimeLatencies = new ArrayList<>();
     private final List<Long> serverGetLatencies = new ArrayList<>();
-    private List<Long> putInCacheLatencies = new ArrayList<>();
+    private final List<Long> putInCacheLatencies = new ArrayList<>();
 
     public BenchmarkingCachedJedis(String host, int port) {
         super(host, port);
     }
 
-    @Override
-    protected void invalidateCache(String key) {
-        super.invalidateCache(key);
-        if (staleTime.get(key)!=null) {
-            staleTimeLatencies.add(System.nanoTime() - staleTime.get(key));
-            staleTime.remove(key);
-        }
-    }
 
     public Boolean boolGet(String key) {
         if (isCachingEnabled()) {
@@ -64,9 +54,6 @@ public class BenchmarkingCachedJedis extends CachedJedis {
         }
     }
 
-    public List<Long> getStaleTimeLatencies(){
-        return staleTimeLatencies;
-    }
     public List<Long> getServerGetLatencies(){
         return serverGetLatencies;
     }

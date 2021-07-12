@@ -39,7 +39,6 @@ public class CachedJedisLatencies {
     private final AtomicLong totalGet = new AtomicLong();
 
     private final List<Long> operationsTimeLatencies = new CopyOnWriteArrayList<>();
-    private final List<Long> staleTimeLatencies = new CopyOnWriteArrayList<>();
     private final List<Long> serverLatencies = new CopyOnWriteArrayList<>();
     private final List<Long> cacheLatencies = new CopyOnWriteArrayList<>();
     //To keep track of the last client setting the key
@@ -105,12 +104,6 @@ public class CachedJedisLatencies {
         System.out.println("---------------------------------------------------------------------------");
     }
 
-    public void getStaleLatencies() {
-        System.out.println("Stale Latencies in seconds");
-        printPValues(staleTimeLatencies);
-        System.out.println("---------------------------------------------------------------------------");
-    }
-
     public  void  getServerLatencies(){
         System.out.println("latencies for sever operations in ms");
         printPValues(serverLatencies);
@@ -156,7 +149,7 @@ public class CachedJedisLatencies {
                         //SET functionality
                         String randomString = BenchmarkingUtil.randomString(messageSize);
                         start = System.nanoTime();
-                        jedis.set(String.valueOf(randomKey), randomString);
+                        jedis.set(KEY_PREFIX + randomKey, randomString);
                         end = System.nanoTime();
                         serverSetLatencies.add(end - start);
                         //Updating the value of clientId writing on the key
@@ -170,18 +163,14 @@ public class CachedJedisLatencies {
                         end = System.nanoTime();
                         if (flag) {
                             boolean value = checkStale.get(KEY_PREFIX + randomKey).contains(clientId);
-                            //Check if the value is stale
                             if (!value) {
-                                //Set the time when the key was stale
-                                  if (jedis.staleTime.get(KEY_PREFIX + randomKey) == null) {
-                                      jedis.staleTime.put(KEY_PREFIX + randomKey, System.nanoTime());
-                                    }
                                 staleCount.incrementAndGet();
-                                }
+                            }
+                            //Check if the value is stale
                             cacheGetLatencies.add(end - start);
                             //key found in cache
                             cacheHit.incrementAndGet();
-                            } else{
+                        } else{
                             checkStale.get(KEY_PREFIX + randomKey).add(clientId);
                         }
                     }
@@ -195,7 +184,6 @@ public class CachedJedisLatencies {
                 serverLatencies.addAll(jedis.getServerGetLatencies());
                 serverLatencies.addAll(serverSetLatencies);
                 operationsTimeLatencies.addAll(localOperationLatencies);
-                staleTimeLatencies.addAll(jedis.getStaleTimeLatencies());
                 cacheLatencies.addAll(cacheGetLatencies);
                 cacheLatencies.addAll(jedis.getPutInCacheLatencies());
 
@@ -213,8 +201,8 @@ public class CachedJedisLatencies {
                                                      .expireAfterAccess(expireAfterAccessMillis)
                                                      .build();
             benchmarkingCachedJedis.setupCaching(jedisCacheConfig);
-            populateCheckStale();
         }
+        populateCheckStale();
         return benchmarkingCachedJedis;
     }
 
@@ -252,6 +240,10 @@ public class CachedJedisLatencies {
         if(latencies.size() == 0) {
             return;
         }
+        long p10Time = latencies.get((int) (latencies.size()*0.1));
+        long p20Time = latencies.get((int) (latencies.size()*0.2));
+        long p30Time = latencies.get((int) (latencies.size()*0.3));
+        long p40Time = latencies.get((int) (latencies.size()*0.4));
         long p50Time = latencies.get((int) (latencies.size() * 0.5));
         long p75Time = latencies.get((int) (latencies.size() * 0.75));
         long p90Time = latencies.get((int) (latencies.size() * 0.90));
@@ -263,6 +255,10 @@ public class CachedJedisLatencies {
         long p999Time = latencies.get((int) (latencies.size() * 0.999));
         long p9995Time = latencies.get((int) (latencies.size() * 0.9995));
         long p100Time = latencies.get((latencies.size() - 1));
+        System.out.println("P10 "+p10Time/1000000.0);
+        System.out.println("P25 "+p20Time/1000000.0);
+        System.out.println("P30 "+p30Time/1000000.0);
+        System.out.println("P40 "+p40Time/1000000.0);
         System.out.println("P50 " + p50Time/1000000.0);
         System.out.println("P75 " + p75Time/1000000.0);
         System.out.println("P90 " + p90Time/1000000.0);

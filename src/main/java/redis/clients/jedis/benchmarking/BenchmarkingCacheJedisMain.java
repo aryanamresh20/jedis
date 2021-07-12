@@ -25,12 +25,13 @@ public class BenchmarkingCacheJedisMain {
 
             BenchmarkingUtil.populateKeys(hostName, portNumber, numberOfKeys, messageSize);
 
+
             CachedJedisLatencies cachedJedisLatencies =
                 new CachedJedisLatencies(hostName, portNumber, writePercentage, numberOfClients,
                                          numberOfKeys, numberOfOperations, sigmaOperationTime, meanOperationTime,
                                          expireAfterAccess, expireAfterWrite, messageSize, warmCacheIterations,
                                          readFromGroup, true);
-            cachedJedisLatencies.beginBencmark();
+            cachedJedisLatencies.beginBenchmark();
 
             System.out.println("Stale values " + cachedJedisLatencies.getStaleCount());
             System.out.println("Cache Hits " + cachedJedisLatencies.getCacheHit());
@@ -38,8 +39,6 @@ public class BenchmarkingCacheJedisMain {
             System.out.println("--------------------------------------------------------------");
             //To get overall latencies
             cachedJedisLatencies.getOverallLatencies();
-            //To get latencies of stale time
-            cachedJedisLatencies.getStaleLatencies();
             //To get latencies of the server hits
             cachedJedisLatencies.getServerLatencies();
             //To get latencies of the cache hits

@@ -79,7 +79,9 @@ public class BenchmarkingUtil {
             String cursor = SCAN_POINTER_START;
             do {
                 ScanResult<String> keys = jedis.scan(cursor, params);
-                jedis.unlink(keys.getResult().toArray(new String[0]));
+                if(keys.getResult().size() != 0) {
+                    jedis.unlink(keys.getResult().toArray(new String[0]));
+                }
                 cursor = keys.getCursor();
             } while (!cursor.equals(SCAN_POINTER_START));
             jedis.quit();
