@@ -43,7 +43,7 @@ public class CachedJedisLatencies {
     private final List<Long> serverLatencies = new CopyOnWriteArrayList<>();
     private final List<Long> cacheLatencies = new CopyOnWriteArrayList<>();
     //To keep track of the last client setting the key
-    private final ConcurrentHashMap<String , String > checkStale = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String , HashSet<String> > checkStale = new ConcurrentHashMap<>();
 
     public CachedJedisLatencies(String hostName, int portNumber, long writePercentage, long totalClients,
                                 long totalKeys, long totalOperations, long sigmaOperationTime, long meanOperationTime,
@@ -67,7 +67,7 @@ public class CachedJedisLatencies {
     }
 
     //Starting multiple cacheJedis instances on multiple threads
-    public void beginBencmark() {
+    public void beginBenchmark() {
         List<Thread> threadList = new ArrayList<>();
         for (int i = 0; i < totalClients; i++) {
             Thread thread = new Thread(createBenchmarkingRunnable(i));
@@ -131,7 +131,7 @@ public class CachedJedisLatencies {
         return random < writePercentage;
     }
 
-    private Runnable createBenchmarkingRunnable(int index) {
+    public Runnable createBenchmarkingRunnable(int index) {
         return () -> {
             try (BenchmarkingCachedJedis jedis = getJedisInstance()) {
                 List<Long> localOperationLatencies = new ArrayList<>();
@@ -141,10 +141,11 @@ public class CachedJedisLatencies {
                 long lowerBoundGroup = index * interval;
                 long upperBoundGroup = index * (interval) + interval;
                 String clientId = String.valueOf(jedis.clientId());
-
                 //Populating Cache
                 for (int i = 0; i < warmCacheIterations; i++) {
-                    jedis.get(KEY_PREFIX + getRandomKey(upperBoundGroup, lowerBoundGroup));
+                    long randomKey = getRandomKey(upperBoundGroup, lowerBoundGroup);
+                    jedis.get(KEY_PREFIX + randomKey);
+                    checkStale.get(KEY_PREFIX + randomKey).add(clientId);
                 }
 
                 for (int i = 0; i < totalOperations; i++) {
@@ -159,7 +160,7 @@ public class CachedJedisLatencies {
                         end = System.nanoTime();
                         serverSetLatencies.add(end - start);
                         //Updating the value of clientId writing on the key
-                        checkStale.put(KEY_PREFIX + randomKey, clientId);
+                        checkStale.get(KEY_PREFIX + randomKey).clear();
                     } else {
                         //GET functionality
                         totalGet.incrementAndGet();
@@ -168,20 +169,20 @@ public class CachedJedisLatencies {
                         Boolean flag = jedis.boolGet(KEY_PREFIX + randomKey);
                         end = System.nanoTime();
                         if (flag) {
+                            boolean value = checkStale.get(KEY_PREFIX + randomKey).contains(clientId);
+                            //Check if the value is stale
+                            if (!value) {
+                                //Set the time when the key was stale
+                                  if (jedis.staleTime.get(KEY_PREFIX + randomKey) == null) {
+                                      jedis.staleTime.put(KEY_PREFIX + randomKey, System.nanoTime());
+                                    }
+                                staleCount.incrementAndGet();
+                                }
                             cacheGetLatencies.add(end - start);
                             //key found in cache
                             cacheHit.incrementAndGet();
-                            String value = checkStale.get(KEY_PREFIX + randomKey);
-                            if (value != null) {
-                                //Check if the value is stale
-                                if (!(value.equals(clientId))) {
-                                    staleCount.incrementAndGet();
-                                    //Set the time when the key was stale
-                                    if (jedis.staleTime.get(KEY_PREFIX + randomKey) == null) {
-                                        jedis.staleTime.put(KEY_PREFIX + randomKey, System.nanoTime());
-                                    }
-                                }
-                            }
+                            } else{
+                            checkStale.get(KEY_PREFIX + randomKey).add(clientId);
                         }
                     }
                     localOperationLatencies.add(end - start);
@@ -191,12 +192,12 @@ public class CachedJedisLatencies {
                         e.printStackTrace();
                     }
                 }
-                serverLatencies.addAll(jedis.serverGetLatencies);
+                serverLatencies.addAll(jedis.getServerGetLatencies());
                 serverLatencies.addAll(serverSetLatencies);
                 operationsTimeLatencies.addAll(localOperationLatencies);
-                staleTimeLatencies.addAll(jedis.staleTimeLatencies);
+                staleTimeLatencies.addAll(jedis.getStaleTimeLatencies());
                 cacheLatencies.addAll(cacheGetLatencies);
-                cacheLatencies.addAll(jedis.putInCacheLatencies);
+                cacheLatencies.addAll(jedis.getPutInCacheLatencies());
 
                 jedis.quit();
             }
@@ -212,8 +213,15 @@ public class CachedJedisLatencies {
                                                      .expireAfterAccess(expireAfterAccessMillis)
                                                      .build();
             benchmarkingCachedJedis.setupCaching(jedisCacheConfig);
+            populateCheckStale();
         }
         return benchmarkingCachedJedis;
+    }
+
+    private void populateCheckStale(){
+        for(int i = 0 ; i < totalKeys ; i++){
+            checkStale.put(KEY_PREFIX + i , new HashSet<>());
+        }
     }
 
     //returns true if the client will read from its group else false
