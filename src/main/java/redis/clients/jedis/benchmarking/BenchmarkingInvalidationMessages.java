@@ -38,8 +38,8 @@ public class BenchmarkingInvalidationMessages extends CachedJedis {
     }
     @Override
     protected void invalidateCache(String key) {
-        super.invalidateCache(key);
         invalidationTime.add(System.nanoTime());
+        super.invalidateCache(key);
     }
 
     public void getInvalidationLatency(){

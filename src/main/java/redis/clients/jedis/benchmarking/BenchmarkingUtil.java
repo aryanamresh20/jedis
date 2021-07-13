@@ -7,9 +7,7 @@ import redis.clients.jedis.ScanResult;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
@@ -88,9 +86,16 @@ public class BenchmarkingUtil {
         }
     }
 
-    public static void warmCache(CachedJedis cachedJedis, long warmCacheIterations, long totalKeys, boolean hashKeys) {
-        for (int i = 0; i < warmCacheIterations; i++) {
-            long key = ThreadLocalRandom.current().nextLong(totalKeys);
+    public static void warmCache(CachedJedis cachedJedis, long warmCachePercentage, long totalKeys, boolean hashKeys) {
+
+        long totalKeysToFilled = (long) ((warmCachePercentage/100.0)*totalKeys);
+        ArrayList <Long> listOfkeys = new ArrayList<>();
+        for(long i=0 ; i<totalKeys ; i++){
+            listOfkeys.add(i);
+        }
+        Collections.shuffle(listOfkeys);
+        for (int i = 0; i < totalKeysToFilled; i++) {
+            long key = listOfkeys.get(i);
             // Initial Reads , reads directly from the server
             if (!hashKeys) {
                 cachedJedis.get(KEY_PREFIX + key);

@@ -17,7 +17,6 @@ public class BenchmarkingInvalidationMessagesMain {
 
             BenchmarkingInvalidationMessages benchmarkingInvalidationMessages = new BenchmarkingInvalidationMessages(hostName ,
                     portNumber , numberOfKeys);
-
             benchmarkingInvalidationMessages.getInvalidationLatency();
 
         } catch (Exception ex) {

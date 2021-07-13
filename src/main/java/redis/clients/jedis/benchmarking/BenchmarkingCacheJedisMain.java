@@ -25,7 +25,6 @@ public class BenchmarkingCacheJedisMain {
 
             BenchmarkingUtil.populateKeys(hostName, portNumber, numberOfKeys, messageSize);
 
-
             CachedJedisLatencies cachedJedisLatencies =
                 new CachedJedisLatencies(hostName, portNumber, writePercentage, numberOfClients,
                                          numberOfKeys, numberOfOperations, sigmaOperationTime, meanOperationTime,

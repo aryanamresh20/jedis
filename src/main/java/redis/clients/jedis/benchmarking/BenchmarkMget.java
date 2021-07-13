@@ -17,16 +17,16 @@ public class BenchmarkMget {
     private final long totalKeys;
     private final long expireTimeAccess;
     private final long expireTimeWrite;
-    private final long warmCacheIterations;
+    private final long warmCachePercentage;
 
     public BenchmarkMget(String host, int port, long numberOfKeys, long expireAfterAccess,
-                         long expireAfterWrite, long warmCacheIterations) {
+                         long expireAfterWrite, long warmCachePercentage) {
         this.hostName = host;
         this.portNumber = port;
         this.totalKeys = numberOfKeys;
         this.expireTimeAccess = expireAfterAccess;
         this.expireTimeWrite = expireAfterWrite;
-        this.warmCacheIterations = warmCacheIterations;
+        this.warmCachePercentage = warmCachePercentage;
     }
 
     public long getJedisRunningTime() {
@@ -53,7 +53,7 @@ public class BenchmarkMget {
                 .build();
             cachedJedisInstance.setupCaching(jedisCacheConfig);
             if (warmCache) {
-                BenchmarkingUtil.warmCache(cachedJedisInstance, warmCacheIterations, totalKeys, false);
+                BenchmarkingUtil.warmCache(cachedJedisInstance, warmCachePercentage, totalKeys, false);
             }
             long finalDuration = 0;
             for (int i = 0; i < totalKeys; i++) {
@@ -70,7 +70,7 @@ public class BenchmarkMget {
 
     private String[] getSampleKeys() {
         List<String> mgetInstance = new ArrayList<>();
-        long numberOfKeys = ThreadLocalRandom.current().nextLong(1, totalKeys);
+        long numberOfKeys = ThreadLocalRandom.current().nextLong(1, totalKeys/500);
         for (int j = 0; j < numberOfKeys; j++) {
             mgetInstance.add(KEY_PREFIX + ThreadLocalRandom.current().nextLong(totalKeys));
         }

@@ -13,16 +13,16 @@ public class BenchmarkHgetall {
     private final long totalKeys;
     private final long expireTimeAccess;
     private final long expireTimeWrite;
-    private final long warmCacheIterations;
+    private final long warmCachePercentage;
 
     public BenchmarkHgetall(String host, int port, long numberOfKeys, long expireAfterAccess,
-                            long expireAfterWrite, long warmCacheIterations) {
+                        long expireAfterWrite, long warmCachePercentage) {
         this.hostName = host;
         this.portNumber = port;
         this.totalKeys = numberOfKeys;
         this.expireTimeAccess = expireAfterAccess;
         this.expireTimeWrite = expireAfterWrite;
-        this.warmCacheIterations = warmCacheIterations;
+        this.warmCachePercentage = warmCachePercentage;
     }
 
     public long getJedisRunningTime() {
@@ -47,7 +47,7 @@ public class BenchmarkHgetall {
                 .build();
             cachedJedisInstance.setupCaching(jedisCacheConfig);
             if (warmCache) {
-                BenchmarkingUtil.warmCache(cachedJedisInstance, warmCacheIterations, totalKeys, true);
+                BenchmarkingUtil.warmCache(cachedJedisInstance, warmCachePercentage, totalKeys, true);
             }
             long begin = System.currentTimeMillis();
             for (int i = 0; i < totalKeys; i++) {
