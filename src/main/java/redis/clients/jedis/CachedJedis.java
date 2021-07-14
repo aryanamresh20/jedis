@@ -34,27 +34,35 @@ public class CachedJedis extends Jedis {
 
     private final Jedis invalidationConnection;
     private Cache<String , Object> cache = CacheBuilder.newBuilder().build();
-    private volatile boolean cachingEnabled;
+    private volatile boolean cachingEnabled = true;
     private volatile long clientId;
-    public static Jedis jedis11 = new Jedis();
-    public static Jedis jedis22 = new Jedis();
-    public static JedisPubSub pubSubInstance = createPubSubInstance();
-    byte[][] clientTrackingArgsp = new byte[][]{
-            SafeEncoder.encode("TRACKING"),
-            SafeEncoder.encode("ON"),
-            SafeEncoder.encode("REDIRECT"),
-            SafeEncoder.encode(String.valueOf(jedis11.clientId())),
-            SafeEncoder.encode("BCAST")
-    };
-    Object str = jedis22.sendCommand(CLIENT,clientTrackingArgsp);
-    public  static  List <CachedJedis> listp = new ArrayList<>();
+    public static Jedis jedis11;
+    public static Jedis jedis22;
+    public static JedisPubSub pubSubInstance;
+    public  static  List <CachedJedis> listp;
     public static class MyRunnable implements Runnable{
         @Override
         public void run() {
             jedis11.subscribe(pubSubInstance, INVALIDATION_CHANNEL);
         }
     }
-    public static Thread thread = new Thread(new MyRunnable());
+    public static Thread thread;
+    static {
+        jedis11 = new Jedis();
+        jedis22 = new Jedis();
+        listp = new ArrayList<>();
+        byte[][] clientTrackingArgsp = new byte[][]{
+                SafeEncoder.encode("TRACKING"),
+                SafeEncoder.encode("ON"),
+                SafeEncoder.encode("REDIRECT"),
+                SafeEncoder.encode(String.valueOf(jedis11.clientId())),
+                SafeEncoder.encode("BCAST")
+        };
+        pubSubInstance = createPubSubInstance();
+        jedis22.sendCommand(CLIENT,clientTrackingArgsp);
+        thread = new Thread(new MyRunnable());
+        thread.start();
+    }
 
     public CachedJedis() {
         super();
@@ -413,13 +421,13 @@ public class CachedJedis extends Jedis {
         return new JedisPubSub() {
             @Override
             public void onMessage(String channel, String message) {
-                System.out.println("message recieved");
+                unsubscribe();
             }
 
             @Override
             public void onMessage(String channel, List<Object> message) {
-                System.out.println("message");
                 for (Object instance : message) {
+                    System.out.println(instance);
                     for (int i=0 ; i<listp.size();i++){
                         listp.get(i).invalidateCache(String.valueOf(instance));
                     }

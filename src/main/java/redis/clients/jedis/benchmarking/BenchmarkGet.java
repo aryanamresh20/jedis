@@ -45,7 +45,7 @@ public class BenchmarkGet {
                 .expireAfterAccess(expireTimeAccess)
                 .expireAfterWrite(expireTimeWrite)
                 .build();
-            cachedJedisInstance.setupCaching(jedisCacheConfig);
+            //cachedJedisInstance.setupCaching(jedisCacheConfig);
             if (warmCache) {
                 BenchmarkingUtil.warmCache(cachedJedisInstance, warmCachePercentage, totalKeys, false);
             }

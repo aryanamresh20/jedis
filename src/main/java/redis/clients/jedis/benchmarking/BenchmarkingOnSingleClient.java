@@ -42,43 +42,6 @@ public class BenchmarkingOnSingleClient {
                     System.out.println("Cache get reads time Taken by CachedJedis instance " +
                             cachedJedisWarmTime);
 
-
-                    //Comparing the time elapsed for hget reads with a mix of server and cache hits
-                    BenchmarkHgetall benchmarkHgetall =
-                            new BenchmarkHgetall(hostName, portNumber, numberOfKeys, expireAfterAccess, expireAfterWrite, warmCachePercentage);
-
-                    jedisTime = benchmarkHgetall.getJedisRunningTime();
-                    cacheJedisTime = benchmarkHgetall.getCachedJedisRunningTime(false);
-                    cachedJedisWarmTime = benchmarkHgetall.getCachedJedisRunningTime(true);
-                    list.set(3, list.get(3)+jedisTime);
-                    list.set(4, list.get(4)+cacheJedisTime);
-                    list.set(5, list.get(5)+cachedJedisWarmTime);
-
-                    System.out.println("Cache hegtAll reads time Taken by normal jedis instance " +
-                            jedisTime);
-                    System.out.println("Cache hgetAll reads time Taken by CachedJedis instance " +
-                            cacheJedisTime);
-                    System.out.println("Cache hgetAll reads time Taken by CachedJedis instance " +
-                            cachedJedisWarmTime);
-
-                    //Comparing the time elapsed for mget reads with a mix of server and cache hits
-                    BenchmarkMget benchmarkMget =
-                            new BenchmarkMget(hostName, portNumber, numberOfKeys, expireAfterAccess, expireAfterWrite, warmCachePercentage);
-
-                    jedisTime = benchmarkMget.getJedisRunningTime();
-                    cacheJedisTime = benchmarkMget.getCachedJedisRunningTime(false);
-                    cachedJedisWarmTime = benchmarkMget.getCachedJedisRunningTime(true);
-                    list.set(6, list.get(6)+jedisTime);
-                    list.set(7, list.get(7)+cacheJedisTime);
-                    list.set(8, list.get(8)+cachedJedisWarmTime);
-
-                    System.out.println("Cache mget reads time Taken by normal jedis instance " +
-                            jedisTime);
-                    System.out.println("Cache mget reads time Taken by CachedJedis instance " +
-                            cacheJedisTime);
-                    System.out.println("Cache mget reads time Taken by CachedJedis instance " +
-                            cachedJedisWarmTime);
-                    System.out.println("--------------------------------------------------------");
                 }
                 System.out.println("Average Times");
                 for(int i =0 ;i < 9 ; i++){

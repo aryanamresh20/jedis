@@ -18,7 +18,7 @@ public class CachedJedisTests {
     public void CachedJedisGetTest() throws InterruptedException {
 
         CachedJedis cachedJedis = new CachedJedis(); //Cached Jedis Object
-        cachedJedis.setupCaching(JedisCacheConfig.Builder.newBuilder().build());
+        //cachedJedis.setupCaching(JedisCacheConfig.Builder.newBuilder().build());
         Jedis jedis = new Jedis(); //Simple Jedis Object
         cachedJedis.set("foo","bar");
         assertEquals(0, cachedJedis.getCacheSize()); //Nothing in the cache at starting
@@ -43,7 +43,7 @@ public class CachedJedisTests {
     @Test
     public void CachedJedisMgetTest() throws InterruptedException{
         CachedJedis cachedJedis = new CachedJedis(); //Cache Jedis Object
-        cachedJedis.setupCaching(JedisCacheConfig.Builder.newBuilder().build());
+       // cachedJedis.setupCaching(JedisCacheConfig.Builder.newBuilder().build());
         Jedis jedis = new Jedis(); //Jedis Object
         jedis.mset("foo","bar","foo1","bar1","foo2","bar2"); //Populating database with three keys
         List<String> jedisResponse = jedis.mget("foo","foo1","foo2");
@@ -74,7 +74,7 @@ public class CachedJedisTests {
         map.put("hello2","world2");
 
         CachedJedis cachedJedis = new CachedJedis(); //Cache Jedis Object
-        cachedJedis.setupCaching(JedisCacheConfig.Builder.newBuilder().build());
+       // cachedJedis.setupCaching(JedisCacheConfig.Builder.newBuilder().build());
         Jedis jedis = new Jedis(); //Jedis Object
         jedis.hset("keyhash" , map); //Populating database with a hashMap
         Map<String , String> jedisResponse = jedis.hgetAll("keyhash");
