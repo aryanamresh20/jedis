@@ -70,7 +70,7 @@ public class BenchmarkMget {
 
     private String[] getSampleKeys() {
         List<String> mgetInstance = new ArrayList<>();
-        long numberOfKeys = ThreadLocalRandom.current().nextLong(1, totalKeys/500);
+        long numberOfKeys = ThreadLocalRandom.current().nextLong(1, Math.max(100,totalKeys/500));
         for (int j = 0; j < numberOfKeys; j++) {
             mgetInstance.add(KEY_PREFIX + ThreadLocalRandom.current().nextLong(totalKeys));
         }

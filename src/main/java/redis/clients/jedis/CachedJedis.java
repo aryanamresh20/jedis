@@ -33,13 +33,33 @@ public class CachedJedis extends Jedis {
     private static final Object DUMMY = new Object();
 
     private final Jedis invalidationConnection;
-    private Cache<String , Object> cache;
+    private Cache<String , Object> cache = CacheBuilder.newBuilder().build();
     private volatile boolean cachingEnabled;
     private volatile long clientId;
+    public static Jedis jedis11 = new Jedis();
+    public static Jedis jedis22 = new Jedis();
+    public static JedisPubSub pubSubInstance = createPubSubInstance();
+    byte[][] clientTrackingArgsp = new byte[][]{
+            SafeEncoder.encode("TRACKING"),
+            SafeEncoder.encode("ON"),
+            SafeEncoder.encode("REDIRECT"),
+            SafeEncoder.encode(String.valueOf(jedis11.clientId())),
+            SafeEncoder.encode("BCAST")
+    };
+    Object str = jedis22.sendCommand(CLIENT,clientTrackingArgsp);
+    public  static  List <CachedJedis> listp = new ArrayList<>();
+    public static class MyRunnable implements Runnable{
+        @Override
+        public void run() {
+            jedis11.subscribe(pubSubInstance, INVALIDATION_CHANNEL);
+        }
+    }
+    public static Thread thread = new Thread(new MyRunnable());
 
     public CachedJedis() {
         super();
         invalidationConnection = new Jedis();
+        listp.add(this);
     }
 
     public CachedJedis(String uri) {
@@ -389,21 +409,26 @@ public class CachedJedis extends Jedis {
         thread.start();
     }
 
-    private JedisPubSub createPubSubInstance() {
+    private static JedisPubSub createPubSubInstance() {
         return new JedisPubSub() {
             @Override
             public void onMessage(String channel, String message) {
-                String poisonMessage = POISON_PILL + clientId;
-                if(channel.equals(INVALIDATION_CHANNEL) && poisonMessage.equals(message)) {
-                    unsubscribe(INVALIDATION_CHANNEL);
-                }
+                System.out.println("message recieved");
             }
 
             @Override
             public void onMessage(String channel, List<Object> message) {
+                System.out.println("message");
                 for (Object instance : message) {
-                    invalidateCache(String.valueOf(instance));
+                    for (int i=0 ; i<listp.size();i++){
+                        listp.get(i).invalidateCache(String.valueOf(instance));
+                    }
                 }
+            }
+
+            @Override
+            public void onSubscribe(String channel, int subscribedChannels) {
+                System.out.println("subscribed");
             }
         };
     }
