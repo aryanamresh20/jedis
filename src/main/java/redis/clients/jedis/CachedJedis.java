@@ -34,7 +34,7 @@ public class CachedJedis extends Jedis {
 
     private final Jedis invalidationConnection;
     private Cache<String , Object> cache = CacheBuilder.newBuilder().build();
-    private volatile boolean cachingEnabled = true;
+    private volatile boolean cachingEnabled = true ;
     private volatile long clientId;
     public static Jedis jedis11;
     public static Jedis jedis22;
@@ -428,8 +428,7 @@ public class CachedJedis extends Jedis {
             @Override
             public void onMessage(String channel, List<Object> message) {
                 for (Object instance : message) {
-                    System.out.println(instance);
-                    System.out.println(listp.size());
+                    //System.out.println(instance);
                     for (int i=0 ; i<listp.size();i++){
                         listp.get(i).invalidateCache(String.valueOf(instance));
                     }
