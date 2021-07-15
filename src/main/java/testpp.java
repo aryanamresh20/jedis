@@ -10,6 +10,8 @@ public class testpp {
         for(int i=0;i<100;i++){
             jedis.set("foo","neww");
         }
+        cachedJedis.close();
+        jedis.set("foo","neww");
         cachedJedis.publish("__redis__:invalidate","close");
     }
 }

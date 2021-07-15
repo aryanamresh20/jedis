@@ -88,6 +88,7 @@ public class CachedJedis extends Jedis {
     public CachedJedis(String host, int port) {
         super(host, port);
         invalidationConnection = new Jedis(host,port);
+        listp.add(this);
     }
 
     public CachedJedis(String host, int port, boolean ssl) {
@@ -340,7 +341,7 @@ public class CachedJedis extends Jedis {
     }
 
     @VisibleForTesting
-    protected void invalidateCache(String key) {
+    public void invalidateCache(String key) {
         cache.invalidate(key);
     }
 
@@ -421,13 +422,14 @@ public class CachedJedis extends Jedis {
         return new JedisPubSub() {
             @Override
             public void onMessage(String channel, String message) {
-                unsubscribe();
+               // unsubscribe();
             }
 
             @Override
             public void onMessage(String channel, List<Object> message) {
                 for (Object instance : message) {
                     System.out.println(instance);
+                    System.out.println(listp.size());
                     for (int i=0 ; i<listp.size();i++){
                         listp.get(i).invalidateCache(String.valueOf(instance));
                     }
