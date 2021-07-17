@@ -186,7 +186,6 @@ public class CachedJedisLatencies {
                 operationsTimeLatencies.addAll(localOperationLatencies);
                 cacheLatencies.addAll(cacheGetLatencies);
                 cacheLatencies.addAll(jedis.getPutInCacheLatencies());
-
                 jedis.quit();
             }
         };

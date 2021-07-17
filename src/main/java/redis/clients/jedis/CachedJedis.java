@@ -13,6 +13,7 @@ import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocketFactory;
 import java.net.URI;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 
 import static redis.clients.jedis.JedisCacheConfig.TrackingMode.BROADCASTING;
@@ -39,7 +40,7 @@ public class CachedJedis extends Jedis {
     public static Jedis jedis11;
     public static Jedis jedis22;
     public static JedisPubSub pubSubInstance;
-    public  static  List <CachedJedis> listp;
+    public static CopyOnWriteArrayList<CachedJedis> listp;
     public static class MyRunnable implements Runnable{
         @Override
         public void run() {
@@ -50,7 +51,7 @@ public class CachedJedis extends Jedis {
     static {
         jedis11 = new Jedis();
         jedis22 = new Jedis();
-        listp = new ArrayList<>();
+        listp = new CopyOnWriteArrayList<>();
         byte[][] clientTrackingArgsp = new byte[][]{
                 SafeEncoder.encode("TRACKING"),
                 SafeEncoder.encode("ON"),
