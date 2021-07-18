@@ -34,7 +34,17 @@ public class CachedJedis extends Jedis {
     private static final Object DUMMY = new Object();
 
     private final Jedis invalidationConnection;
-    private Cache<String , Object> cache = CacheBuilder.newBuilder().build();
+    public JedisCacheConfig jedisCacheConfig =
+            JedisCacheConfig.Builder.newBuilder().maxCacheSize(20000)
+                    .expireAfterWrite(100000000)
+                    .expireAfterAccess(100000000)
+                    .build();
+    private Cache<String , Object> cache = CacheBuilder.newBuilder()
+            .maximumSize(jedisCacheConfig.getMaxCacheSize())
+            .expireAfterAccess(jedisCacheConfig.getExpireAfterAccessMillis(), TimeUnit.MILLISECONDS)
+            .expireAfterWrite(jedisCacheConfig.getExpireAfterWriteMillis(), TimeUnit.MILLISECONDS)
+            .concurrencyLevel(jedisCacheConfig.getConcurrencyLevel())
+            .build();
     private volatile boolean cachingEnabled = true ;
     private volatile long clientId;
     public static Jedis jedis11;
@@ -335,9 +345,6 @@ public class CachedJedis extends Jedis {
 
     @Override
     public void close() {
-        if (cachingEnabled) {
-            pushPoisonPill();
-        }
         super.close();
     }
 
