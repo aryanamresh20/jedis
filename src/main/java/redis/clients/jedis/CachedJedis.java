@@ -13,6 +13,7 @@ import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocketFactory;
 import java.net.URI;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 
 import static redis.clients.jedis.JedisCacheConfig.TrackingMode.BROADCASTING;
@@ -33,13 +34,51 @@ public class CachedJedis extends Jedis {
     private static final Object DUMMY = new Object();
 
     private final Jedis invalidationConnection;
-    private Cache<String , Object> cache;
-    private volatile boolean cachingEnabled;
+    public JedisCacheConfig jedisCacheConfig =
+            JedisCacheConfig.Builder.newBuilder().maxCacheSize(20000)
+                    .expireAfterWrite(100000000)
+                    .expireAfterAccess(100000000)
+                    .build();
+    private Cache<String , Object> cache = CacheBuilder.newBuilder()
+            .maximumSize(jedisCacheConfig.getMaxCacheSize())
+            .expireAfterAccess(jedisCacheConfig.getExpireAfterAccessMillis(), TimeUnit.MILLISECONDS)
+            .expireAfterWrite(jedisCacheConfig.getExpireAfterWriteMillis(), TimeUnit.MILLISECONDS)
+            .concurrencyLevel(jedisCacheConfig.getConcurrencyLevel())
+            .build();
+    private volatile boolean cachingEnabled = true ;
     private volatile long clientId;
+    public static Jedis jedis11;
+    public static Jedis jedis22;
+    public static JedisPubSub pubSubInstance;
+    public static CopyOnWriteArrayList<CachedJedis> listp;
+    public static class MyRunnable implements Runnable{
+        @Override
+        public void run() {
+            jedis11.subscribe(pubSubInstance, INVALIDATION_CHANNEL);
+        }
+    }
+    public static Thread thread;
+    static {
+        jedis11 = new Jedis();
+        jedis22 = new Jedis();
+        listp = new CopyOnWriteArrayList<>();
+        byte[][] clientTrackingArgsp = new byte[][]{
+                SafeEncoder.encode("TRACKING"),
+                SafeEncoder.encode("ON"),
+                SafeEncoder.encode("REDIRECT"),
+                SafeEncoder.encode(String.valueOf(jedis11.clientId())),
+                SafeEncoder.encode("BCAST")
+        };
+        pubSubInstance = createPubSubInstance();
+        jedis22.sendCommand(CLIENT,clientTrackingArgsp);
+        thread = new Thread(new MyRunnable());
+        thread.start();
+    }
 
     public CachedJedis() {
         super();
         invalidationConnection = new Jedis();
+        listp.add(this);
     }
 
     public CachedJedis(String uri) {
@@ -60,6 +99,7 @@ public class CachedJedis extends Jedis {
     public CachedJedis(String host, int port) {
         super(host, port);
         invalidationConnection = new Jedis(host,port);
+        listp.add(this);
     }
 
     public CachedJedis(String host, int port, boolean ssl) {
@@ -108,14 +148,14 @@ public class CachedJedis extends Jedis {
                        SSLSocketFactory sslSocketFactory, SSLParameters sslParameters, HostnameVerifier hostnameVerifier) {
         super(host, port, connectionTimeout, soTimeout, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
         invalidationConnection = new Jedis(host, port, connectionTimeout, soTimeout, ssl,
-                                           sslSocketFactory, sslParameters, hostnameVerifier);
+                sslSocketFactory, sslParameters, hostnameVerifier);
     }
 
     public CachedJedis(String host, int port, int connectionTimeout, int soTimeout, int infiniteSoTimeout, boolean ssl,
                        SSLSocketFactory sslSocketFactory, SSLParameters sslParameters, HostnameVerifier hostnameVerifier) {
         super(host, port, connectionTimeout, soTimeout, infiniteSoTimeout, ssl, sslSocketFactory, sslParameters, hostnameVerifier);
         invalidationConnection = new Jedis(host, port, connectionTimeout, soTimeout, infiniteSoTimeout,
-                                           ssl, sslSocketFactory, sslParameters, hostnameVerifier);
+                ssl, sslSocketFactory, sslParameters, hostnameVerifier);
     }
 
     public CachedJedis(JedisShardInfo shardInfo) {
@@ -156,10 +196,10 @@ public class CachedJedis extends Jedis {
     }
 
     public CachedJedis(URI uri, int connectionTimeout, int soTimeout, int infiniteSoTimeout
-        , SSLSocketFactory sslSocketFactory, SSLParameters sslParameters, HostnameVerifier hostnameVerifier) {
+            , SSLSocketFactory sslSocketFactory, SSLParameters sslParameters, HostnameVerifier hostnameVerifier) {
         super(uri, connectionTimeout, soTimeout, infiniteSoTimeout, sslSocketFactory, sslParameters, hostnameVerifier);
         invalidationConnection = new Jedis(uri, connectionTimeout, soTimeout, infiniteSoTimeout,
-                                           sslSocketFactory, sslParameters, hostnameVerifier);
+                sslSocketFactory, sslParameters, hostnameVerifier);
     }
 
     public CachedJedis(URI uri, JedisClientConfig config) {
@@ -179,8 +219,8 @@ public class CachedJedis extends Jedis {
 
     public void setupCaching(JedisCacheConfig jedisCacheConfig) {
         if (jedisCacheConfig.isNoLoop() ||
-            jedisCacheConfig.isOptInCaching() ||
-            jedisCacheConfig.getTrackingMode() == BROADCASTING) {
+                jedisCacheConfig.isOptInCaching() ||
+                jedisCacheConfig.getTrackingMode() == BROADCASTING) {
             throw new UnsupportedOperationException("Config options not yet supported");
         }
         cachingEnabled = true;
@@ -305,14 +345,11 @@ public class CachedJedis extends Jedis {
 
     @Override
     public void close() {
-        if (cachingEnabled) {
-            pushPoisonPill();
-        }
         super.close();
     }
 
     @VisibleForTesting
-    protected void invalidateCache(String key) {
+    public void invalidateCache(String key) {
         cache.invalidate(key);
     }
 
@@ -358,10 +395,10 @@ public class CachedJedis extends Jedis {
             case DEFAULT:
                 //CLIENT TRACKING REDIRECT ON clientId
                 byte[][] clientTrackingArgs = new byte[][]{
-                    SafeEncoder.encode("TRACKING"),
-                    SafeEncoder.encode("ON"),
-                    SafeEncoder.encode("REDIRECT"),
-                    SafeEncoder.encode(String.valueOf(invalidationConnection.clientId()))
+                        SafeEncoder.encode("TRACKING"),
+                        SafeEncoder.encode("ON"),
+                        SafeEncoder.encode("REDIRECT"),
+                        SafeEncoder.encode(String.valueOf(invalidationConnection.clientId()))
                 };
                 this.sendCommand(CLIENT, clientTrackingArgs);
                 break;
@@ -389,21 +426,26 @@ public class CachedJedis extends Jedis {
         thread.start();
     }
 
-    private JedisPubSub createPubSubInstance() {
+    private static JedisPubSub createPubSubInstance() {
         return new JedisPubSub() {
             @Override
             public void onMessage(String channel, String message) {
-                String poisonMessage = POISON_PILL + clientId;
-                if(channel.equals(INVALIDATION_CHANNEL) && poisonMessage.equals(message)) {
-                    unsubscribe(INVALIDATION_CHANNEL);
-                }
+                // unsubscribe();
             }
 
             @Override
             public void onMessage(String channel, List<Object> message) {
                 for (Object instance : message) {
-                    invalidateCache(String.valueOf(instance));
+                    //System.out.println(instance);
+                    for (int i=0 ; i<listp.size();i++){
+                        listp.get(i).invalidateCache(String.valueOf(instance));
+                    }
                 }
+            }
+
+            @Override
+            public void onSubscribe(String channel, int subscribedChannels) {
+                System.out.println("subscribed");
             }
         };
     }
@@ -413,4 +455,3 @@ public class CachedJedis extends Jedis {
         this.publish(INVALIDATION_CHANNEL , POISON_PILL + clientId);
     }
 }
-

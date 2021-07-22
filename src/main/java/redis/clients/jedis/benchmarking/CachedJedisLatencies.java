@@ -186,7 +186,6 @@ public class CachedJedisLatencies {
                 operationsTimeLatencies.addAll(localOperationLatencies);
                 cacheLatencies.addAll(cacheGetLatencies);
                 cacheLatencies.addAll(jedis.getPutInCacheLatencies());
-
                 jedis.quit();
             }
         };
@@ -195,11 +194,12 @@ public class CachedJedisLatencies {
     private BenchmarkingCachedJedis getJedisInstance() {
         BenchmarkingCachedJedis benchmarkingCachedJedis = new BenchmarkingCachedJedis(hostName, portNumber);
         if (enableCaching) {
+            System.out.println("aaya");
             JedisCacheConfig jedisCacheConfig =
-                JedisCacheConfig.Builder.newBuilder().maxCacheSize(totalKeys * 2)
-                                                     .expireAfterWrite(expireAfterWriteMillis)
-                                                     .expireAfterAccess(expireAfterAccessMillis)
-                                                     .build();
+                    JedisCacheConfig.Builder.newBuilder().maxCacheSize(totalKeys * 2)
+                            .expireAfterWrite(expireAfterWriteMillis)
+                            .expireAfterAccess(expireAfterAccessMillis)
+                            .build();
             benchmarkingCachedJedis.setupCaching(jedisCacheConfig);
         }
         populateCheckStale();
