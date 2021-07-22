@@ -2,6 +2,7 @@ package redis.clients.jedis.tests;
 
 import org.junit.Test;
 import redis.clients.jedis.CachedJedis;
+import redis.clients.jedis.CachedJedisPool;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCacheConfig;
 
@@ -16,9 +17,9 @@ public class CachedJedisTests {
 
     @Test
     public void CachedJedisGetTest() throws InterruptedException {
-
-        CachedJedis cachedJedis = new CachedJedis(); //Cached Jedis Object
-        cachedJedis.setupCaching(JedisCacheConfig.Builder.newBuilder().build());
+        CachedJedisPool cachedJedisPool = new CachedJedisPool();
+        cachedJedisPool.startCaching();
+        CachedJedis cachedJedis = cachedJedisPool.getResource(); //Cached Jedis Object
         Jedis jedis = new Jedis(); //Simple Jedis Object
         cachedJedis.set("foo","bar");
         assertEquals(0, cachedJedis.getCacheSize()); //Nothing in the cache at starting
@@ -35,15 +36,15 @@ public class CachedJedisTests {
         assertEquals(cachedJedis.get("fooNotExist"),jedis.get("fooNotExist"));   // Both returns null , both get from server
         assertEquals(cachedJedis.get("fooNotExist"),jedis.get("fooNotExist"));   // Both returns null ,cache jedis gets from cache
 
-        cachedJedis.close();
         jedis.close();
 
     }
 
     @Test
     public void CachedJedisMgetTest() throws InterruptedException{
-        CachedJedis cachedJedis = new CachedJedis(); //Cache Jedis Object
-        cachedJedis.setupCaching(JedisCacheConfig.Builder.newBuilder().build());
+        CachedJedisPool cachedJedisPool = new CachedJedisPool();
+        cachedJedisPool.startCaching();
+        CachedJedis cachedJedis = cachedJedisPool.getResource();
         Jedis jedis = new Jedis(); //Jedis Object
         jedis.mset("foo","bar","foo1","bar1","foo2","bar2"); //Populating database with three keys
         List<String> jedisResponse = jedis.mget("foo","foo1","foo2");
@@ -61,7 +62,6 @@ public class CachedJedisTests {
 
         assertEquals(cachedJedis.mget("fooNotExist","foo"),jedis.mget("fooNotExist","foo"));   // for fooNotExist , both get from server , return null
         assertEquals(cachedJedis.mget("fooNotExist","foo"),jedis.mget("fooNotExist","foo"));   // for fooNotExist ,cache jedis gets from cache , returns null
-        cachedJedis.close();
         jedis.close();
     }
 
@@ -73,8 +73,9 @@ public class CachedJedisTests {
         map.put("hello1","world1");
         map.put("hello2","world2");
 
-        CachedJedis cachedJedis = new CachedJedis(); //Cache Jedis Object
-        cachedJedis.setupCaching(JedisCacheConfig.Builder.newBuilder().build());
+        CachedJedisPool cachedJedisPool = new CachedJedisPool();
+        cachedJedisPool.startCaching();
+        CachedJedis cachedJedis = cachedJedisPool.getResource();
         Jedis jedis = new Jedis(); //Jedis Object
         jedis.hset("keyhash" , map); //Populating database with a hashMap
         Map<String , String> jedisResponse = jedis.hgetAll("keyhash");
@@ -96,7 +97,6 @@ public class CachedJedisTests {
         assertEquals(cachedJedis.hgetAll("fooNotExist"),jedis.hgetAll("fooNotExist"));   // Both returns null , both get from server
         assertEquals(cachedJedis.hgetAll("fooNotExist"),jedis.hgetAll("fooNotExist"));   // Both returns null ,cache jedis gets from cache
 
-        cachedJedis.close();
         jedis.close();
 
     }

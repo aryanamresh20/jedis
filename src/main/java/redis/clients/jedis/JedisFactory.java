@@ -6,6 +6,7 @@ import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocketFactory;
 
+import org.apache.commons.pool2.DestroyMode;
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.PooledObjectFactory;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
@@ -169,6 +170,8 @@ public class JedisFactory implements PooledObjectFactory<Jedis> {
       }
     }
   }
+
+ 
 
   @Override
   public PooledObject<Jedis> makeObject() throws Exception {

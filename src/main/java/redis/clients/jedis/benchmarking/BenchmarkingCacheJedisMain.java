@@ -29,7 +29,7 @@ public class BenchmarkingCacheJedisMain {
                 new CachedJedisLatencies(hostName, portNumber, writePercentage, numberOfClients,
                                          numberOfKeys, numberOfOperations, sigmaOperationTime, meanOperationTime,
                                          expireAfterAccess, expireAfterWrite, messageSize, warmCacheIterations,
-                                         readFromGroup, true);
+                                         readFromGroup, false);
             cachedJedisLatencies.beginBenchmark();
 
             System.out.println("Stale values " + cachedJedisLatencies.getStaleCount());

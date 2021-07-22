@@ -2,6 +2,8 @@ package redis.clients.jedis.benchmarking;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import redis.clients.jedis.CachedJedis;
+import redis.clients.jedis.CachedJedisPool;
 import redis.clients.jedis.JedisCacheConfig;
 import redis.clients.jedis.Jedis;
 
@@ -37,7 +39,7 @@ public class CachedJedisLatencies {
     private final AtomicLong staleCount = new AtomicLong();
     private final AtomicLong cacheHit = new AtomicLong();
     private final AtomicLong totalGet = new AtomicLong();
-
+    private CachedJedisPool cachedJedisPool = new CachedJedisPool();
     private final List<Long> operationsTimeLatencies = new CopyOnWriteArrayList<>();
     private final List<Long> serverLatencies = new CopyOnWriteArrayList<>();
     private final List<Long> cacheLatencies = new CopyOnWriteArrayList<>();
@@ -48,6 +50,7 @@ public class CachedJedisLatencies {
                                 long totalKeys, long totalOperations, long sigmaOperationTime, long meanOperationTime,
                                 long expireAfterAccessMillis, long expireAfterWriteMillis, long messageSize,
                                 long warmCacheIterations, long readFromGroup, boolean enableCaching) {
+        cachedJedisPool.startCaching();
         this.hostName = hostName;
         this.portNumber = portNumber;
         this.writePercentage = writePercentage;
@@ -126,7 +129,7 @@ public class CachedJedisLatencies {
 
     public Runnable createBenchmarkingRunnable(int index) {
         return () -> {
-            try (BenchmarkingCachedJedis jedis = getJedisInstance()) {
+            try (CachedJedis jedis = getJedisInstance()) {
                 List<Long> localOperationLatencies = new ArrayList<>();
                 List<Long> serverSetLatencies = new ArrayList<>();
                 List<Long> cacheGetLatencies = new ArrayList<>();
@@ -186,24 +189,14 @@ public class CachedJedisLatencies {
                 operationsTimeLatencies.addAll(localOperationLatencies);
                 cacheLatencies.addAll(cacheGetLatencies);
                 cacheLatencies.addAll(jedis.getPutInCacheLatencies());
-
-                jedis.quit();
             }
         };
     }
 
-    private BenchmarkingCachedJedis getJedisInstance() {
-        BenchmarkingCachedJedis benchmarkingCachedJedis = new BenchmarkingCachedJedis(hostName, portNumber);
-        if (enableCaching) {
-            JedisCacheConfig jedisCacheConfig =
-                JedisCacheConfig.Builder.newBuilder().maxCacheSize(totalKeys * 2)
-                                                     .expireAfterWrite(expireAfterWriteMillis)
-                                                     .expireAfterAccess(expireAfterAccessMillis)
-                                                     .build();
-            benchmarkingCachedJedis.setupCaching(jedisCacheConfig);
-        }
+    private CachedJedis getJedisInstance() {
+        CachedJedis cachedJedis = cachedJedisPool.getResource();
         populateCheckStale();
-        return benchmarkingCachedJedis;
+        return cachedJedis;
     }
 
     private void populateCheckStale(){

@@ -320,6 +320,7 @@ public class JedisPool extends JedisPoolAbstract {
     this(poolConfig, uri, Protocol.DEFAULT_TIMEOUT);
   }
 
+
   public JedisPool(final GenericObjectPoolConfig<Jedis> poolConfig, final URI uri,
       final SSLSocketFactory sslSocketFactory, final SSLParameters sslParameters,
       final HostnameVerifier hostnameVerifier) {
